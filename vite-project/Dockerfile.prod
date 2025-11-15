@@ -33,20 +33,21 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     echo "Extracting npc.rar to npc/ directory..." && \
     7z x npc.rar -onpc -y 2>&1 | tee /tmp/extract.log || true && \
     echo "Checking extraction result..." && \
-    cd .. && \
+    echo "Current directory (should be public/unity): $(pwd)" && \
     echo "Current directory structure:" && \
     ls -la . && \
     echo "Checking npc directory..." && \
     if [ -d "npc" ]; then \
+      echo "✅ npc directory found in $(pwd)/npc" && \
       cd npc && \
       EXTRACTED_COUNT=$(ls -A . 2>/dev/null | wc -l) && \
       echo "Files in npc/ directory: $EXTRACTED_COUNT" && \
-      ls -la . | head -20 || true; \
+      ls -lah . | head -20 || true; \
       if [ -d "Build" ] || [ -f "index.html" ]; then \
         echo "✅ Files extracted successfully to npc/ directory"; \
         if [ -d "Build" ]; then \
           echo "✅ Build directory found"; \
-          ls -la Build/ | head -10 || true; \
+          ls -lah Build/ | head -10 || true; \
         fi; \
       elif [ -d "npc" ]; then \
         echo "⚠️ Nested npc folder detected, moving files up..." && \
@@ -54,7 +55,7 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
         mv npc/.* . 2>/dev/null || true; \
         rmdir npc 2>/dev/null || true; \
         echo "✅ Files moved to correct location"; \
-        ls -la . | head -20 || true; \
+        ls -lah . | head -20 || true; \
       fi; \
       cd ..; \
     else \
@@ -62,7 +63,8 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
       echo "Listing all extracted files:"; \
       find . -maxdepth 2 -type f -o -type d | head -20; \
     fi && \
-    cd ../.. && \
+    cd /app && \
+    echo "Now in /app, verifying public/unity/npc structure..." && \
     rm -f public/unity/npc.rar && \
     echo "==========================================" && \
     echo "📁 VERIFYING FINAL STRUCTURE IN public/unity/npc/" && \
@@ -163,7 +165,7 @@ RUN npm run build && \
       echo "Searching for unity or npc:" && \
       find dist -name "unity" -o -name "npc" 2>/dev/null | head -20; \
     fi && \
-    echo "==========================================" && \
+    echo "=========================================="
 
 # Production stage
 FROM nginx:alpine
