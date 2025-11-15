@@ -100,3 +100,6 @@ vite-project/public/unity/npc/
 # Duplicate jeelizFaceFilter directory (use src/libs version instead)
 vite-project/jeelizFaceFilter/
 
+# Unused jeelizFaceFilter demo files (only core library and glassesVTO demo are used)
+vite-project/src/libs/jeelizFaceFilter/demos/
+
