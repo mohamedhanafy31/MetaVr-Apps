@@ -1,0 +1,49 @@
+=== LOGS RELATED TO yes.data.gz 500 ERROR ===
+
+KEY FINDING: There's a discrepancy between Cloud Run logs and Nginx access logs!
+
+1. CLOUD RUN LOGS (showing 500 errors):
+   - These appear in Cloud Run's aggregated logs as "GET 500"
+   - Example: "2025-11-15 17:04:10 GET 500 https://metavr-frontend-dbgj63mjca-uc.a.run.app/unity/npc/Build/yes.data.gz"
+
+2. NGINX ACCESS LOGS (showing 200 success):
+   - The actual nginx access logs show HTTP 200 with file sizes being served
+   - Example: "169.254.169.126 - - [15/Nov/2025:13:01:47 +0000] "GET /unity/npc/Build/yes.data.gz HTTP/1.1" 200 35651584"
+   - File sizes vary: 33-37 MB (normal for Unity data files)
+
+3. PATTERN OBSERVED:
+   - Cloud Run logs: "GET 500" (error reported)
+   - Nginx logs: "200" with actual bytes transferred (success)
+   - This suggests the file IS being served, but Cloud Run's load balancer/proxy 
+     might be timing out or reporting errors for large file transfers
+
+4. MOST RECENT ERRORS (from latest deployment):
+   2025-11-15 17:04:10 GET 500 https://metavr-frontend-dbgj63mjca-uc.a.run.app/unity/npc/Build/yes.data.gz
+   2025-11-15 17:04:12 GET 500 https://metavr-frontend-dbgj63mjca-uc.a.run.app/unity/npc/Build/yes.data.gz
+   2025-11-15 17:04:19 GET 500 https://metavr-frontend-dbgj63mjca-uc.a.run.app/unity/npc/Build/yes.data.gz
+
+5. SUCCESSFUL REQUESTS (from nginx access logs):
+   2025-11-15 13:01:47 - GET /unity/npc/Build/yes.data.gz HTTP/1.1" 200 35651584
+   2025-11-15 13:15:10 - GET /unity/npc/Build/yes.data.gz HTTP/1.1" 200 35651584
+   2025-11-15 13:20:05 - GET /unity/npc/Build/yes.data.gz HTTP/1.1" 200 36823040
+
+6. OTHER FILES SERVING SUCCESSFULLY:
+   - yes.loader.js: 200 OK
+   - yes.framework.js.gz: 200 OK (110KB)
+   - yes.wasm.gz: 200 OK (22MB)
+
+7. NGINX CONFIGURATION STATUS:
+   - Template processing working: "20-envsubst-on-templates.sh: Running envsubst"
+   - Nginx starting successfully
+   - Port configuration: Using PORT environment variable
+
+POSSIBLE CAUSES:
+1. Cloud Run request timeout (default 300s) might be too short for large files
+2. Cloud Run load balancer timeout
+3. Client-side timeout (browser giving up before file completes)
+4. The 500 might be from a retry/health check, not the actual file request
+
+RECOMMENDATION:
+- Check Cloud Run timeout settings
+- Verify if files are actually being downloaded by clients despite 500 errors
+- Consider increasing Cloud Run timeout for large file transfers

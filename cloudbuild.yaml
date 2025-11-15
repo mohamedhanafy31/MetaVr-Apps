@@ -1,6 +1,9 @@
 substitutions:
   _SHORT_SHA: ''
   _COMMIT_SHA: ''
+  # Unity GCS Bucket: If set, Unity files will be loaded from GCS instead of local nginx
+  # Example: _UNITY_GCS_BUCKET=metavr-unity-build-production
+  _UNITY_GCS_BUCKET: ''
 
 steps:
   # Determine SHORT_SHA: use provided SHORT_SHA, or extract from COMMIT_SHA, or use BUILD_ID
@@ -86,6 +89,7 @@ steps:
         echo ""
     env:
       - 'PROJECT_ID=${PROJECT_ID}'
+      - '_UNITY_GCS_BUCKET=${_UNITY_GCS_BUCKET}'
 
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
@@ -113,6 +117,7 @@ steps:
         echo ""
     env:
       - 'PROJECT_ID=${PROJECT_ID}'
+      - '_UNITY_GCS_BUCKET=${_UNITY_GCS_BUCKET}'
 
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
@@ -138,6 +143,7 @@ steps:
         echo ""
     env:
       - 'PROJECT_ID=${PROJECT_ID}'
+      - '_UNITY_GCS_BUCKET=${_UNITY_GCS_BUCKET}'
 
   # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -162,6 +168,19 @@ steps:
         echo "⏳ Deploying..."
         echo ""
         
+        # Set environment variables for Cloud Run
+        # VITE_UNITY_GCS_BUCKET: If set, Unity files will be loaded from GCS instead of local nginx
+        # To use GCS, set this substitution variable in Cloud Build triggers or set it here:
+        # --set-env-vars VITE_UNITY_GCS_BUCKET=your-bucket-name
+        ENV_VARS=""
+        if [ -n "$${_UNITY_GCS_BUCKET}" ]; then
+          ENV_VARS="--set-env-vars VITE_UNITY_GCS_BUCKET=$${_UNITY_GCS_BUCKET}"
+          echo "📦 Using GCS bucket: $${_UNITY_GCS_BUCKET}"
+        else
+          echo "📦 Using local Unity files (nginx)"
+        fi
+        echo ""
+        
         SERVICE_URL=$$(gcloud run deploy metavr-frontend \
           --image $$IMAGE_TAG \
           --region us-central1 \
@@ -173,6 +192,7 @@ steps:
           --min-instances 0 \
           --max-instances 10 \
           --timeout 300 \
+          $$ENV_VARS \
           --format="value(status.url)") && \
         echo "" && \
         echo "Setting IAM policy for public access..." && \
@@ -210,6 +230,7 @@ steps:
         echo ""
     env:
       - 'PROJECT_ID=${PROJECT_ID}'
+      - '_UNITY_GCS_BUCKET=${_UNITY_GCS_BUCKET}'
 
 images:
   - 'gcr.io/$PROJECT_ID/metavr-frontend:latest'

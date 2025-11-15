@@ -1,12 +1,40 @@
 import { Unity, useUnityContext } from "react-unity-webgl";
 import { Link } from "react-router-dom";
 
+/**
+ * Get Unity file URL - uses GCS if bucket is configured, otherwise uses local path
+ * @param {string} filename - The Unity file name (e.g., "yes.loader.js", "yes.data")
+ * @returns {string} - Full URL to the Unity file
+ */
+function getUnityFileUrl(filename) {
+  const gcsBucket = import.meta.env.VITE_UNITY_GCS_BUCKET;
+  
+  if (gcsBucket) {
+    // Use GCS bucket URL
+    // Note: Files are uploaded without .gz extension but with Content-Encoding: gzip
+    // So yes.data.gz becomes yes.data, yes.wasm.gz becomes yes.wasm, etc.
+    const baseUrl = `https://storage.googleapis.com/${gcsBucket}/unity/npc/Build`;
+    
+    // Remove .gz extension if present (GCS files are stored without .gz but with gzip encoding)
+    const cleanFilename = filename.replace(/\.gz$/, '');
+    
+    return `${baseUrl}/${cleanFilename}`;
+  }
+  
+  // Fallback to local path (served by nginx)
+  return `/unity/npc/Build/${filename}`;
+}
+
 export default function NPCDemo() {
   const { unityProvider, isLoaded, loadingProgression } = useUnityContext({
-    loaderUrl: "/unity/npc/Build/yes.loader.js",
-    dataUrl: "/unity/npc/Build/yes.data.gz",
-    frameworkUrl: "/unity/npc/Build/yes.framework.js.gz",
-    codeUrl: "/unity/npc/Build/yes.wasm.gz",
+    // Use GCS URLs if VITE_UNITY_GCS_BUCKET is set, otherwise use local paths
+    // Note: GCS files are stored without .gz extension (yes.data, yes.wasm, etc.)
+    // but with Content-Encoding: gzip, so we pass the original filenames and
+    // getUnityFileUrl will handle the conversion
+    loaderUrl: getUnityFileUrl("yes.loader.js"),
+    dataUrl: getUnityFileUrl("yes.data.gz"),      // Will become yes.data in GCS
+    frameworkUrl: getUnityFileUrl("yes.framework.js.gz"), // Will become yes.framework.js in GCS
+    codeUrl: getUnityFileUrl("yes.wasm.gz"),      // Will become yes.wasm in GCS
   });
 
   return (

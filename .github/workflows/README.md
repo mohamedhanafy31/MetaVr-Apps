@@ -2,7 +2,14 @@
 
 ## Deploy to Google Cloud Run
 
-This workflow automatically deploys the application to Google Cloud Run when code is pushed to the `main` or `master` branch.
+This workflow automatically:
+1. **Downloads Unity files** from Google Drive
+2. **Creates/updates GCS bucket** for Unity Build files
+3. **Uploads Unity files** to GCS with correct metadata
+4. **Builds and deploys** the application to Cloud Run
+5. **Configures Cloud Run** to use GCS for Unity files
+
+The workflow runs automatically when code is pushed to the `main` or `master` branch.
 
 ### Setup Instructions
 
@@ -15,20 +22,26 @@ This workflow automatically deploys the application to Google Cloud Run when cod
 
 2. **Grant necessary permissions:**
    ```bash
+   SA_EMAIL="github-actions@meta-478212.iam.gserviceaccount.com"
+   
+   # Cloud Run deployment
    gcloud projects add-iam-policy-binding meta-478212 \
-     --member="serviceAccount:github-actions@meta-478212.iam.gserviceaccount.com" \
+     --member="serviceAccount:${SA_EMAIL}" \
      --role="roles/run.admin"
 
+   # Cloud Storage (for GCS bucket and Unity file uploads)
    gcloud projects add-iam-policy-binding meta-478212 \
-     --member="serviceAccount:github-actions@meta-478212.iam.gserviceaccount.com" \
+     --member="serviceAccount:${SA_EMAIL}" \
      --role="roles/storage.admin"
 
+   # Service account user (for Cloud Run deployment)
    gcloud projects add-iam-policy-binding meta-478212 \
-     --member="serviceAccount:github-actions@meta-478212.iam.gserviceaccount.com" \
+     --member="serviceAccount:${SA_EMAIL}" \
      --role="roles/iam.serviceAccountUser"
 
+   # Cloud Build (to submit builds)
    gcloud projects add-iam-policy-binding meta-478212 \
-     --member="serviceAccount:github-actions@meta-478212.iam.gserviceaccount.com" \
+     --member="serviceAccount:${SA_EMAIL}" \
      --role="roles/cloudbuild.builds.editor"
    ```
 
