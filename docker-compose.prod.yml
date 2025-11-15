@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  # Frontend Vite Service (Production Build)
+  frontend:
+    build:
+      context: ./vite-project
+      dockerfile: Dockerfile.prod
+    container_name: unity-frontend
+    ports:
+      - "80:80"
+    networks:
+      - unity-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  unity-network:
+    driver: bridge

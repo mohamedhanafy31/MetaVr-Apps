@@ -1,0 +1,54 @@
+# Multi-stage Dockerfile for Frontend Production Build
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install tools for downloading and extracting
+RUN apk add --no-cache wget unrar curl python3 py3-pip
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy application files
+COPY . .
+
+# Download and extract Unity NPC files from Google Drive
+# File ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
+# Using gdown for reliable large file downloads from Google Drive
+RUN pip3 install --no-cache-dir gdown && \
+    mkdir -p public/unity && \
+    cd public/unity && \
+    echo "Downloading Unity NPC files from Google Drive..." && \
+    gdown 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks -O npc.rar && \
+    echo "Extracting npc.rar..." && \
+    unrar x -o+ npc.rar . && \
+    rm -f npc.rar && \
+    pip3 uninstall -y gdown && \
+    apk del python3 py3-pip && \
+    echo "Unity NPC files extracted successfully"
+
+# Build the application
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+
+# Copy built files from builder
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose port
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
+
