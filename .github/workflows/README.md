@@ -43,6 +43,12 @@ The workflow runs automatically when code is pushed to the `main` or `master` br
    gcloud projects add-iam-policy-binding meta-478212 \
      --member="serviceAccount:${SA_EMAIL}" \
      --role="roles/cloudbuild.builds.editor"
+
+   # Compute Engine (required for Cloud CDN - optional)
+   # Only needed if you enable Cloud CDN via ENABLE_CLOUD_CDN secret
+   gcloud projects add-iam-policy-binding meta-478212 \
+     --member="serviceAccount:${SA_EMAIL}" \
+     --role="roles/compute.admin"
    ```
 
 3. **Create and download the service account key:**
@@ -89,6 +95,37 @@ You can also trigger the workflow manually:
 - `PROJECT_ID`: meta-478212
 - `SERVICE_NAME`: metavr-frontend
 - `REGION`: us-central1
+- `GCS_BUCKET_NAME`: metavr-assets (or set via `UNITY_GCS_BUCKET_NAME` secret)
+- `ENABLE_CDN`: false (or set to 'true' via `ENABLE_CLOUD_CDN` secret)
+
+### GitHub Secrets
+
+1. **`GCP_SA_KEY`** (Required)
+   - Google Cloud service account key JSON
+   - Must have permissions for Storage, Cloud Build, Cloud Run, and optionally Compute (for CDN)
+
+2. **`UNITY_GCS_BUCKET_NAME`** (Optional)
+   - Custom GCS bucket name
+   - Default: `metavr-assets`
+
+3. **`ENABLE_CLOUD_CDN`** (Optional)
+   - Set to `true` to automatically enable Cloud CDN
+   - Default: `false`
+   - **Note**: Cloud CDN requires Load Balancer (~$18/month)
+
+### Cloud CDN Setup
+
+The workflow can automatically set up Cloud CDN if enabled:
+
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Add secret: `ENABLE_CLOUD_CDN` = `true`
+3. The workflow will automatically:
+   - Create backend bucket
+   - Enable Cloud CDN
+   - Create URL map, proxy, and forwarding rule
+   - Reserve static IP
+
+**Note**: Cloud CDN setup requires `roles/compute.admin` permission for the service account.
 
 These can be modified in the workflow file if needed.
 
