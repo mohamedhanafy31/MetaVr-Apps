@@ -29,10 +29,21 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      pull-requests: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Verify GCP Secret
+        run: |
+          if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then
+            echo "❌ Error: GCP_SA_KEY secret is not set!"
+            echo "Please add it in: Settings > Secrets and variables > Actions"
+            exit 1
+          else
+            echo "✅ GCP_SA_KEY secret is set"
+          fi
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -44,9 +55,17 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
+          export_default_credentials: true
 
       - name: Configure Docker
         run: gcloud auth configure-docker
+
+      - name: Grant Cloud Build Service Account permissions
+        run: |
+          PROJECT_NUMBER=$(gcloud projects describe ${{ env.PROJECT_ID }} --format='value(projectNumber)')
+          gcloud projects add-iam-policy-binding ${{ env.PROJECT_ID }} \
+            --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+            --role="roles/run.admin" || echo "Permissions may already be set"
 
       - name: Submit to Cloud Build
         run: |
