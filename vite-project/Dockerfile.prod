@@ -107,18 +107,20 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     echo "==========================================" && \
     echo "🔍 CRITICAL: Verifying required files exist" && \
     echo "==========================================" && \
-    if [ ! -f "public/unity/npc/index.html" ] || [ ! -d "public/unity/npc/Build" ]; then \
+    MISSING=0 && \
+    if [ ! -f "public/unity/npc/index.html" ]; then \
+      echo "❌ ERROR: index.html is missing!"; \
+      MISSING=1; \
+    fi; \
+    if [ ! -d "public/unity/npc/Build" ]; then \
+      echo "❌ ERROR: Build directory is missing!"; \
+      MISSING=1; \
+    fi; \
+    if [ "$$MISSING" = "1" ]; then \
       echo ""; \
       echo "=========================================="; \
       echo "❌ BUILD FAILED: Required Unity NPC files are missing!"; \
       echo "=========================================="; \
-      if [ ! -f "public/unity/npc/index.html" ]; then \
-        echo "❌ ERROR: index.html is missing!"; \
-      fi; \
-      if [ ! -d "public/unity/npc/Build" ]; then \
-        echo "❌ ERROR: Build directory is missing!"; \
-      fi; \
-      echo ""; \
       echo "The RAR file appears to be corrupted or incomplete."; \
       echo "Expected files:"; \
       echo "  - public/unity/npc/index.html"; \
@@ -129,7 +131,7 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
       echo ""; \
       echo "Please check the RAR file on Google Drive and ensure it contains:"; \
       echo "  - index.html"; \
-      echo "  - Build/ directory with Unity WebGL files"; \
+      echo "  - Build/ directory with Unity WebGL files (yes.loader.js, yes.data.gz, etc.)"; \
       echo "  - All other required Unity assets"; \
       echo ""; \
       echo "The RAR file may need to be re-uploaded."; \
@@ -137,6 +139,12 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     else \
       echo "✅ index.html found!"; \
       echo "✅ Build directory found!"; \
+      echo "Checking for Unity files in Build directory..." && \
+      if [ -f "public/unity/npc/Build/yes.loader.js" ] || [ -f "public/unity/npc/Build/npc.loader.js" ]; then \
+        echo "✅ Unity loader file found!"; \
+      else \
+        echo "⚠️ WARNING: Unity loader file not found (expected yes.loader.js or npc.loader.js)"; \
+      fi; \
       echo "✅ All required files found!"; \
     fi && \
     rm -f public/unity/npc.rar && \

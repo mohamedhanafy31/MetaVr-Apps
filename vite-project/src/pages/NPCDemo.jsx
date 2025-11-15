@@ -3,10 +3,10 @@ import { Link } from "react-router-dom";
 
 export default function NPCDemo() {
   const { unityProvider, isLoaded, loadingProgression } = useUnityContext({
-    loaderUrl: "/unity/npc/Build/npc.loader.js",
-    dataUrl: "/unity/npc/Build/npc.data",
-    frameworkUrl: "/unity/npc/Build/npc.framework.js",
-    codeUrl: "/unity/npc/Build/npc.wasm",
+    loaderUrl: "/unity/npc/Build/yes.loader.js",
+    dataUrl: "/unity/npc/Build/yes.data.gz",
+    frameworkUrl: "/unity/npc/Build/yes.framework.js.gz",
+    codeUrl: "/unity/npc/Build/yes.wasm.gz",
   });
 
   return (
