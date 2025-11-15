@@ -173,7 +173,14 @@ steps:
           --min-instances 0 \
           --max-instances 10 \
           --timeout 300 \
-          --format="value(status.url)"
+          --format="value(status.url)" && \
+        echo "" && \
+        echo "Setting IAM policy for public access..." && \
+        gcloud run services add-iam-policy-binding metavr-frontend \
+          --region us-central1 \
+          --member=allUsers \
+          --role=roles/run.invoker \
+          --quiet || echo "IAM policy may already be set"
         
         echo ""
         echo "=========================================="
