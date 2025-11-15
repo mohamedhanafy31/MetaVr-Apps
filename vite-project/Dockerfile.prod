@@ -19,7 +19,7 @@ COPY . .
 # Download and extract Unity NPC files from Google Drive
 # File ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
 # Using gdown for reliable large file downloads from Google Drive
-RUN pip3 install --no-cache-dir gdown && \
+RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     mkdir -p public/unity && \
     cd public/unity && \
     echo "Downloading Unity NPC files from Google Drive..." && \
@@ -27,7 +27,7 @@ RUN pip3 install --no-cache-dir gdown && \
     echo "Extracting npc.rar..." && \
     7z x npc.rar -o. -y && \
     rm -f npc.rar && \
-    pip3 uninstall -y gdown && \
+    pip3 uninstall -y --break-system-packages gdown && \
     apk del python3 py3-pip p7zip && \
     echo "Unity NPC files extracted successfully"
 
