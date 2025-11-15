@@ -302,6 +302,41 @@ FROM nginx:alpine
 # Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Verify files are copied correctly
+RUN echo "==========================================" && \
+    echo "📁 VERIFYING FILES IN /usr/share/nginx/html" && \
+    echo "==========================================" && \
+    ls -lah /usr/share/nginx/html/ && \
+    echo "" && \
+    echo "📊 File count:" && \
+    find /usr/share/nginx/html -type f | wc -l && \
+    echo "📁 Directory count:" && \
+    find /usr/share/nginx/html -type d | wc -l && \
+    echo "" && \
+    echo "🔍 Checking for Unity NPC files:" && \
+    if [ -d "/usr/share/nginx/html/unity/npc" ]; then \
+        echo "✅ Unity NPC directory exists!" && \
+        ls -lah /usr/share/nginx/html/unity/npc/ && \
+        echo "" && \
+        if [ -f "/usr/share/nginx/html/unity/npc/index.html" ]; then \
+            echo "✅ index.html found!"; \
+        else \
+            echo "❌ index.html NOT found!"; \
+        fi && \
+        if [ -d "/usr/share/nginx/html/unity/npc/Build" ]; then \
+            echo "✅ Build directory found!" && \
+            ls -lah /usr/share/nginx/html/unity/npc/Build/ | head -10; \
+        else \
+            echo "❌ Build directory NOT found!"; \
+        fi; \
+    else \
+        echo "❌ Unity NPC directory NOT found!"; \
+    fi && \
+    echo "==========================================" && \
+    echo "📂 Complete directory tree (first 3 levels):" && \
+    find /usr/share/nginx/html -maxdepth 3 -type d | head -30 && \
+    echo "=========================================="
+
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
