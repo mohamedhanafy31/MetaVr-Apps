@@ -61,10 +61,12 @@ jobs:
         run: gcloud auth configure-docker
 
       - name: Enable required APIs
+        continue-on-error: true
         run: |
-          gcloud services enable cloudresourcemanager.googleapis.com --quiet || echo "API may already be enabled"
-          gcloud services enable cloudbuild.googleapis.com --quiet || echo "API may already be enabled"
-          gcloud services enable run.googleapis.com --quiet || echo "API may already be enabled"
+          gcloud services enable cloudresourcemanager.googleapis.com --quiet
+          gcloud services enable cloudbuild.googleapis.com --quiet
+          gcloud services enable run.googleapis.com --quiet
+          gcloud services enable containerregistry.googleapis.com --quiet
 
       - name: Grant Cloud Build Service Account permissions
         run: |
