@@ -5,6 +5,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Install tools for downloading and extracting
+# Unity NPC files are ignored by git (too large), so they must be downloaded during build
 # Enable non-free repository for unrar (Debian requires non-free for unrar)
 # Using gdown for Google Drive downloads (reliable, handles large files automatically)
 RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
