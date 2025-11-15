@@ -94,7 +94,7 @@ jobs:
           
           # Submit build and capture output with progress tracking
           gcloud builds submit --config cloudbuild.yaml \
-            --substitutions=COMMIT_SHA=${{ github.sha }},SHORT_SHA=${SHORT_SHA} 2>&1 | \
+            --substitutions=_COMMIT_SHA=${{ github.sha }},_SHORT_SHA=${SHORT_SHA} 2>&1 | \
           while IFS= read -r line || [ -n "$line" ]; do
             # Highlight archive creation with file count and size
             if echo "$line" | grep -q "Creating temporary archive"; then

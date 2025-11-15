@@ -41,6 +41,7 @@ steps:
     args:
       - '-c'
       - |
+        set -e
         echo "=========================================="
         echo "🔨 Step 2/5: Building Docker Image"
         echo "=========================================="
@@ -55,7 +56,22 @@ steps:
         echo "📦 Also tagging as: $$IMAGE_LATEST"
         echo "⏳ This may take a few minutes..."
         echo ""
+        echo "📁 Current directory: $$(pwd)"
+        echo "📁 Listing files:"
+        ls -la | head -20
+        echo ""
+        echo "📁 Checking vite-project:"
+        ls -la vite-project/ | head -10 || echo "vite-project not found!"
+        echo ""
         
+        if [ ! -f "vite-project/Dockerfile.prod" ]; then
+          echo "❌ ERROR: Dockerfile.prod not found!"
+          echo "Looking for: vite-project/Dockerfile.prod"
+          find . -name "Dockerfile.prod" 2>/dev/null || echo "Dockerfile.prod not found anywhere!"
+          exit 1
+        fi
+        
+        echo "✅ Dockerfile.prod found, starting build..."
         docker build \
           -t $$IMAGE_TAG \
           -t $$IMAGE_LATEST \
@@ -65,6 +81,8 @@ steps:
         echo ""
         echo "✅ Docker image built successfully!"
         echo "📦 Image: $$IMAGE_TAG"
+        echo "📦 Verifying image exists..."
+        docker images | grep metavr-frontend || echo "⚠️ Image not found in local registry"
         echo ""
     env:
       - 'PROJECT_ID=${PROJECT_ID}'

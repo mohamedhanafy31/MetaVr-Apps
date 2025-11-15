@@ -69,16 +69,23 @@ jobs:
           gcloud services enable containerregistry.googleapis.com --quiet
 
       - name: Grant Cloud Build Service Account permissions
+        continue-on-error: true
         run: |
           PROJECT_NUMBER=$(gcloud projects describe ${{ env.PROJECT_ID }} --format='value(projectNumber)')
           gcloud projects add-iam-policy-binding ${{ env.PROJECT_ID }} \
             --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
             --role="roles/run.admin" \
             --condition=None || echo "Permissions may already be set"
+          gcloud projects add-iam-policy-binding ${{ env.PROJECT_ID }} \
+            --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+            --role="roles/iam.serviceAccountUser" \
+            --condition=None || echo "Permissions may already be set"
 
       - name: Submit to Cloud Build
         run: |
-          gcloud builds submit --config cloudbuild.yaml
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          gcloud builds submit --config cloudbuild.yaml \
+            --substitutions=_COMMIT_SHA=${{ github.sha }},_SHORT_SHA=${SHORT_SHA}
 
       - name: Get Service URL
         id: service-url
