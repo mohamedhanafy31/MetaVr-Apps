@@ -110,15 +110,31 @@ RUN mkdir -p public/unity/npc && \
         echo "Contents of npc folder:"; \
         ls -lah npc/; \
         echo ""; \
-        echo "All files in npc folder:"; \
-        find npc -type f; \
-        echo ""; \
-        echo "All directories in npc folder:"; \
-        find npc -type d; \
-        echo ""; \
-        echo "Moving npc folder contents to target location..."; \
-        cp -r npc/* /app/public/unity/npc/ 2>&1 || echo "Copy failed, trying alternative..."; \
-        cp -r npc/.??* /app/public/unity/npc/ 2>&1 || true; \
+        echo "Copying only required Unity WebGL files (excluding node_modules, package.json, server.js)..."; \
+        echo "Copying Build directory..."; \
+        if [ -d "npc/Build" ]; then \
+            cp -r npc/Build /app/public/unity/npc/ && \
+            echo "✅ Build directory copied"; \
+        else \
+            echo "❌ ERROR: Build directory not found in npc/"; \
+            exit 1; \
+        fi && \
+        echo "Copying TemplateData directory..."; \
+        if [ -d "npc/TemplateData" ]; then \
+            cp -r npc/TemplateData /app/public/unity/npc/ && \
+            echo "✅ TemplateData directory copied"; \
+        fi && \
+        echo "Copying index.html..."; \
+        if [ -f "npc/index.html" ]; then \
+            cp npc/index.html /app/public/unity/npc/ && \
+            echo "✅ index.html copied"; \
+        else \
+            echo "❌ ERROR: index.html not found in npc/"; \
+            exit 1; \
+        fi && \
+        echo "Copying logo files (if any)..."; \
+        cp npc/logo*.png /app/public/unity/npc/ 2>/dev/null || true && \
+        echo "✅ Required files copied (node_modules, package.json, server.js excluded)"; \
     elif [ -f "index.html" ] || [ -d "Build" ]; then \
         echo "✅ Files found at root of extraction"; \
         echo "Root files:"; \
