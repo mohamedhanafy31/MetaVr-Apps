@@ -8,6 +8,11 @@ vite-project/public/unity/npc/
 # Test downloads
 test-download/
 
+# Service account keys (should never be committed)
+*service-account*.json
+github-actions-key.json
+*-key.json
+
 # Node
 node_modules/
 npm-debug.log*
