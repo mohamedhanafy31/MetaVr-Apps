@@ -107,20 +107,18 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     echo "==========================================" && \
     echo "🔍 CRITICAL: Verifying required files exist" && \
     echo "==========================================" && \
-    MISSING_FILES=0 && \
-    if [ ! -f "public/unity/npc/index.html" ]; then \
-      echo "❌ ERROR: index.html is missing!"; \
-      MISSING_FILES=1; \
-    fi && \
-    if [ ! -d "public/unity/npc/Build" ]; then \
-      echo "❌ ERROR: Build directory is missing!"; \
-      MISSING_FILES=1; \
-    fi && \
-    if [ "$$MISSING_FILES" = "1" ]; then \
+    if [ ! -f "public/unity/npc/index.html" ] || [ ! -d "public/unity/npc/Build" ]; then \
       echo ""; \
       echo "=========================================="; \
       echo "❌ BUILD FAILED: Required Unity NPC files are missing!"; \
       echo "=========================================="; \
+      if [ ! -f "public/unity/npc/index.html" ]; then \
+        echo "❌ ERROR: index.html is missing!"; \
+      fi; \
+      if [ ! -d "public/unity/npc/Build" ]; then \
+        echo "❌ ERROR: Build directory is missing!"; \
+      fi; \
+      echo ""; \
       echo "The RAR file appears to be corrupted or incomplete."; \
       echo "Expected files:"; \
       echo "  - public/unity/npc/index.html"; \
@@ -137,6 +135,8 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
       echo "The RAR file may need to be re-uploaded."; \
       exit 1; \
     else \
+      echo "✅ index.html found!"; \
+      echo "✅ Build directory found!"; \
       echo "✅ All required files found!"; \
     fi && \
     rm -f public/unity/npc.rar && \
