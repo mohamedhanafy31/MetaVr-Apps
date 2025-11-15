@@ -162,7 +162,7 @@ steps:
         echo "⏳ Deploying..."
         echo ""
         
-        gcloud run deploy metavr-frontend \
+        SERVICE_URL=$$(gcloud run deploy metavr-frontend \
           --image $$IMAGE_TAG \
           --region us-central1 \
           --platform managed \
@@ -173,20 +173,40 @@ steps:
           --min-instances 0 \
           --max-instances 10 \
           --timeout 300 \
-          --format="value(status.url)" && \
+          --format="value(status.url)") && \
         echo "" && \
         echo "Setting IAM policy for public access..." && \
         gcloud run services add-iam-policy-binding metavr-frontend \
           --region us-central1 \
           --member=allUsers \
           --role=roles/run.invoker \
-          --quiet || echo "IAM policy may already be set"
-        
-        echo ""
-        echo "=========================================="
-        echo "✅ Deployment completed successfully!"
-        echo "=========================================="
-        echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')"
+          --quiet || echo "IAM policy may already be set" && \
+        echo "" && \
+        echo "==========================================" && \
+        echo "🔍 Health Check: Testing Unity NPC Page" && \
+        echo "==========================================" && \
+        echo "Service URL: $$SERVICE_URL" && \
+        echo "Testing Unity NPC page: $$SERVICE_URL/unity/npc/index.html" && \
+        echo "Waiting 10 seconds for service to be ready..." && \
+        sleep 10 && \
+        HTTP_CODE=$$(curl -s -o /dev/null -w "%{http_code}" "$$SERVICE_URL/unity/npc/index.html") && \
+        echo "HTTP Status Code: $$HTTP_CODE" && \
+        if [ "$$HTTP_CODE" = "200" ]; then \
+          echo "✅ Unity NPC page is accessible (200 OK)"; \
+        elif [ "$$HTTP_CODE" = "404" ]; then \
+          echo "❌ ERROR: Unity NPC page returned 404 Not Found!"; \
+          echo "The deployment failed because the Unity NPC page is not accessible."; \
+          echo "Please check the build logs for extraction issues."; \
+          exit 1; \
+        else \
+          echo "⚠️ WARNING: Unity NPC page returned HTTP $$HTTP_CODE"; \
+          echo "This may indicate an issue. Please verify manually."; \
+        fi && \
+        echo "" && \
+        echo "==========================================" && \
+        echo "✅ Deployment completed successfully!" && \
+        echo "==========================================" && \
+        echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')" && \
         echo ""
     env:
       - 'PROJECT_ID=${PROJECT_ID}'
