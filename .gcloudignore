@@ -9,7 +9,10 @@
 # Docker
 docker-compose*.yml
 .dockerignore
+# Exclude all Dockerfiles, but allow Dockerfile.prod for Cloud Build
 Dockerfile*
+!Dockerfile.prod
+!**/Dockerfile.prod
 *.dockerfile
 
 # Node
