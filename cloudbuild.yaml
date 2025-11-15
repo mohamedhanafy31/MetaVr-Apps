@@ -4,6 +4,9 @@ substitutions:
   # Unity GCS Bucket: If set, Unity files will be loaded from GCS instead of local nginx
   # Example: _UNITY_GCS_BUCKET=metavr-unity-build-production
   _UNITY_GCS_BUCKET: ''
+  # CDN IP: If set, nginx will use CDN URL instead of direct GCS (faster performance)
+  # Example: _CDN_IP=34.102.136.180
+  _CDN_IP: ''
 
 steps:
   # Determine SHORT_SHA: use provided SHORT_SHA, or extract from COMMIT_SHA, or use BUILD_ID
@@ -170,14 +173,25 @@ steps:
         
         # Set environment variables for Cloud Run
         # VITE_UNITY_GCS_BUCKET: If set, Unity files will be loaded from GCS instead of local nginx
-        # To use GCS, set this substitution variable in Cloud Build triggers or set it here:
-        # --set-env-vars VITE_UNITY_GCS_BUCKET=your-bucket-name
+        # CDN_IP: If set, nginx will use CDN URL for faster performance
         ENV_VARS=""
         if [ -n "$${_UNITY_GCS_BUCKET}" ]; then
           ENV_VARS="--set-env-vars VITE_UNITY_GCS_BUCKET=$${_UNITY_GCS_BUCKET}"
           echo "📦 Using GCS bucket: $${_UNITY_GCS_BUCKET}"
         else
           echo "📦 Using local Unity files (nginx)"
+        fi
+        
+        # Add CDN IP if available (for nginx proxy_pass optimization)
+        if [ -n "$${_CDN_IP}" ]; then
+          if [ -n "$$ENV_VARS" ]; then
+            ENV_VARS="$$ENV_VARS,CDN_IP=$${_CDN_IP}"
+          else
+            ENV_VARS="--set-env-vars CDN_IP=$${_CDN_IP}"
+          fi
+          echo "🌐 Using CDN IP: $${_CDN_IP} (faster performance)"
+        else
+          echo "📦 Using direct GCS proxy (CDN not configured)"
         fi
         echo ""
         

@@ -438,16 +438,27 @@ jobs:
             echo "CDN_IP=$IP_ADDRESS" >> $GITHUB_ENV
           fi
 
-      - name: Output GCS bucket name
+      - name: Output GCS bucket name and CDN IP
         id: gcs-bucket
         run: |
           echo "bucket=${{ env.GCS_BUCKET_NAME }}" >> $GITHUB_OUTPUT
           echo "✅ GCS bucket ready: ${{ env.GCS_BUCKET_NAME }}"
+          
+          # Get CDN IP if available (from previous step)
+          if [ -n "${{ env.CDN_IP }}" ]; then
+            echo "cdn_ip=${{ env.CDN_IP }}" >> $GITHUB_OUTPUT
+            echo "✅ CDN IP available: ${{ env.CDN_IP }}"
+          else
+            echo "cdn_ip=" >> $GITHUB_OUTPUT
+            echo "⚠️  CDN IP not available (will use GCS directly)"
+          fi
 
   deploy:
     name: Build and Deploy to Cloud Run
     runs-on: ubuntu-latest
     needs: setup-gcs-and-upload
+    outputs:
+      cdn_ip: ${{ needs.setup-gcs-and-upload.outputs.cdn_ip }}
     
     permissions:
       contents: read
@@ -504,15 +515,22 @@ jobs:
             --role="roles/iam.serviceAccountUser" \
             --condition=None || echo "Permissions may already be set"
 
-      - name: Submit to Cloud Build with GCS bucket
+      - name: Submit to Cloud Build with GCS bucket and CDN IP
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           GCS_BUCKET="${{ env.GCS_BUCKET_NAME }}"
+          CDN_IP="${{ needs.setup-gcs-and-upload.outputs.cdn_ip }}"
           
           echo "🚀 Deploying with GCS bucket: $GCS_BUCKET"
-          
-          gcloud builds submit --config cloudbuild.yaml \
-            --substitutions=_COMMIT_SHA=${{ github.sha }},_SHORT_SHA=${SHORT_SHA},_UNITY_GCS_BUCKET=${GCS_BUCKET}
+          if [ -n "$CDN_IP" ]; then
+            echo "🌐 Using CDN IP: $CDN_IP"
+            gcloud builds submit --config cloudbuild.yaml \
+              --substitutions=_COMMIT_SHA=${{ github.sha }},_SHORT_SHA=${SHORT_SHA},_UNITY_GCS_BUCKET=${GCS_BUCKET},_CDN_IP=${CDN_IP}
+          else
+            echo "📦 Using GCS directly (CDN not available)"
+            gcloud builds submit --config cloudbuild.yaml \
+              --substitutions=_COMMIT_SHA=${{ github.sha }},_SHORT_SHA=${SHORT_SHA},_UNITY_GCS_BUCKET=${GCS_BUCKET}
+          fi
 
       - name: Get Service URL
         id: service-url
