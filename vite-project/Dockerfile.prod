@@ -49,10 +49,34 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
       unrar x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || (echo "unrar failed, trying Python rarfile..." && python3 -c "import rarfile; rf = rarfile.RarFile('/app/public/unity/npc.rar'); rf.extractall('.'); print('Extraction complete')" 2>&1 | tee -a /tmp/extract.log || true); \
     elif python3 -c "import rarfile" 2>/dev/null; then \
       echo "Using Python rarfile for extraction..." && \
-      python3 -c "import rarfile; rf = rarfile.RarFile('/app/public/unity/npc.rar'); rf.extractall('.'); print('Extraction complete')" 2>&1 | tee /tmp/extract.log || true; \
+      python3 << 'PYEOF' 2>&1 | tee /tmp/extract.log || true
+import rarfile
+import sys
+import os
+
+try:
+    rf = rarfile.RarFile('/app/public/unity/npc.rar')
+    print(f"RAR file opened successfully. Number of files: {len(rf.namelist())}")
+    print("Extracting all files...")
+    rf.extractall('.')
+    print("Extraction complete!")
+    print(f"Extracted files: {len([f for f in os.listdir('.') if os.path.isfile(f)])}")
+    print(f"Extracted directories: {len([d for d in os.listdir('.') if os.path.isdir(d)])}")
+except Exception as e:
+    print(f"ERROR during extraction: {e}", file=sys.stderr)
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+PYEOF
     else \
       echo "Using 7z as fallback (may not fully support RAR v5)..." && \
       7z x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || true; \
+    fi && \
+    echo "" && \
+    echo "Checking extraction results..." && \
+    if [ -f "/tmp/extract.log" ]; then \
+      echo "Extraction log (last 50 lines):"; \
+      tail -50 /tmp/extract.log; \
     fi && \
     echo "" && \
     echo "==========================================" && \
@@ -68,16 +92,24 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     echo "Looking for key files/folders..." && \
     echo "Has npc folder: $([ -d "npc" ] && echo "YES" || echo "NO")" && \
     echo "Has index.html: $([ -f "index.html" ] && echo "YES" || echo "NO")" && \
+    echo "Has npc/index.html: $([ -f "npc/index.html" ] && echo "YES" || echo "NO")" && \
     echo "Has Build folder: $([ -d "Build" ] && echo "YES" || echo "NO")" && \
+    echo "Has npc/Build folder: $([ -d "npc/Build" ] && echo "YES" || echo "NO")" && \
+    echo "" && \
+    echo "All extracted files and directories:" && \
+    find . -type f -o -type d | sort && \
     echo "" && \
     if [ -d "npc" ]; then \
       echo "✅ Found npc folder in extraction"; \
       echo "Contents of npc folder:"; \
       ls -lah npc/; \
-      echo "Subdirectories in npc:"; \
-      find npc -type d | head -20; \
-      echo "Files in npc:"; \
-      find npc -type f | head -30; \
+      echo ""; \
+      echo "All files in npc folder:"; \
+      find npc -type f; \
+      echo ""; \
+      echo "All directories in npc folder:"; \
+      find npc -type d; \
+      echo ""; \
       echo "Moving npc folder contents to target location..."; \
       cp -r npc/* /app/public/unity/npc/ 2>&1 || echo "Copy failed, trying alternative..."; \
       cp -r npc/.??* /app/public/unity/npc/ 2>&1 || true; \
