@@ -4,7 +4,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install tools for downloading and extracting
-RUN apk add --no-cache wget unrar curl python3 py3-pip
+# Using p7zip instead of unrar (unrar not available in Alpine)
+RUN apk add --no-cache wget p7zip curl python3 py3-pip
 
 # Copy package files
 COPY package*.json ./
@@ -24,10 +25,10 @@ RUN pip3 install --no-cache-dir gdown && \
     echo "Downloading Unity NPC files from Google Drive..." && \
     gdown 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks -O npc.rar && \
     echo "Extracting npc.rar..." && \
-    unrar x -o+ npc.rar . && \
+    7z x npc.rar -o. -y && \
     rm -f npc.rar && \
     pip3 uninstall -y gdown && \
-    apk del python3 py3-pip && \
+    apk del python3 py3-pip p7zip && \
     echo "Unity NPC files extracted successfully"
 
 # Build the application

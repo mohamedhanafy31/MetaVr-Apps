@@ -1,9 +1,15 @@
-name: Deploy to Google Cloud Run
+name: Deploy to Google Cloud Run (Detailed Logging)
+
+# NOTE: This workflow is a backup/alternative to deploy-gcp.yml
+# Only one should run at a time. To use this instead, disable deploy-gcp.yml
+# or delete it. This workflow has better progress logging but same functionality.
 
 on:
-  push:
-    branches:
-      - main
+  # Disabled by default - only runs on manual trigger
+  # Uncomment the push section below if you want to use this instead of deploy-gcp.yml
+  # push:
+  #   branches:
+  #     - main
   workflow_dispatch: # Allows manual triggering
 
 env:
@@ -169,4 +175,22 @@ jobs:
           echo "=========================================="
           echo "✅ Deployment process completed!"
           echo "=========================================="
+          
+      - name: Get Service URL
+        id: service-url
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --format 'value(status.url)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "🚀 Service deployed at: $URL"
+
+      - name: Output Service URL
+        run: |
+          echo "🚀 Deployment successful!"
+          echo "Service URL: ${{ steps.service-url.outputs.url }}"
+          echo ""
+          echo "Your application is now live at:"
+          echo "${{ steps.service-url.outputs.url }}"
 
