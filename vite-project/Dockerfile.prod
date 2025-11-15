@@ -4,14 +4,29 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Install tools for downloading and extracting Unity files
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    unzip \
-    p7zip-full \
-    curl \
-    && pip3 install --break-system-packages gdown \
-    && rm -rf /var/lib/apt/lists/*
+# Enable non-free repository for unrar (Debian requires non-free for unrar)
+# Using unrar for RAR v5 support (7z doesn't fully support RAR v5)
+RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list.d/debian.sources; \
+    else \
+        sed -i 's/deb \(.*\) main/deb \1 main contrib non-free/g' /etc/apt/sources.list || \
+        (echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+         echo "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+         echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list); \
+    fi && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        file \
+        p7zip-full \
+        unrar \
+        python3 \
+        python3-pip \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Install gdown for Google Drive downloads
+    # Using --break-system-packages is safe in Docker containers (isolated environment)
+    pip3 install --no-cache-dir --break-system-packages gdown rarfile
 
 # Copy package files
 COPY package*.json ./
@@ -22,21 +37,222 @@ RUN npm ci
 # Copy application files
 COPY . .
 
-# Create Unity NPC directory
-RUN mkdir -p public/unity/npc
+# Download and extract Unity NPC files from Google Drive
+# File ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
+# Using gdown for reliable Google Drive downloads (handles large files automatically)
+# Using unrar for RAR v5 support (7z doesn't fully support RAR v5)
+# Extract to public/unity/npc/ directory
+RUN mkdir -p public/unity/npc && \
+    cd public/unity && \
+    echo "Downloading Unity NPC files from Google Drive..." && \
+    FILE_ID="1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks" && \
+    echo "File ID: $FILE_ID" && \
+    echo "Using gdown to download file..." && \
+    gdown "$FILE_ID" -O npc.rar || (echo "ERROR: gdown failed to download the file" && exit 1) && \
+    echo "Verifying downloaded file..." && \
+    ls -lh npc.rar && \
+    FILE_TYPE=$(file npc.rar 2>/dev/null || echo "unknown") && \
+    echo "File type: $FILE_TYPE" && \
+    echo "==========================================" && \
+    echo "🔍 DEBUG: Starting RAR extraction process" && \
+    echo "==========================================" && \
+    echo "RAR file location: /app/public/unity/npc.rar" && \
+    echo "RAR file size: $(ls -lh /app/public/unity/npc.rar | awk '{print $5}')" && \
+    echo "Target directory: /app/public/unity/npc/" && \
+    echo "" && \
+    echo "Extracting npc.rar to temporary directory..." && \
+    mkdir -p /tmp/extract_temp && \
+    cd /tmp/extract_temp && \
+    echo "DEBUG: Extracting from $(pwd)" && \
+    if command -v unrar >/dev/null 2>&1; then \
+        echo "Using unrar for extraction (best RAR v5 support)..." && \
+        unrar x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || \
+        (echo "unrar failed, trying 7z..." && \
+         7z x /app/public/unity/npc.rar -y 2>&1 | tee -a /tmp/extract.log || \
+         (echo "7z failed, trying Python rarfile..." && \
+          python3 -c "import rarfile; rf = rarfile.RarFile('/app/public/unity/npc.rar'); rf.extractall('.'); print('Extraction complete')" 2>&1 | tee -a /tmp/extract.log || true)); \
+    elif command -v 7z >/dev/null 2>&1; then \
+        echo "Using 7z for extraction (may not fully support RAR v5)..." && \
+        7z x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || \
+        (echo "7z failed, trying Python rarfile..." && \
+         python3 -c "import rarfile; rf = rarfile.RarFile('/app/public/unity/npc.rar'); rf.extractall('.'); print('Extraction complete')" 2>&1 | tee -a /tmp/extract.log || true); \
+    elif python3 -c "import rarfile" 2>/dev/null; then \
+        echo "Using Python rarfile for extraction..." && \
+        python3 -c "import rarfile, os; rf = rarfile.RarFile('/app/public/unity/npc.rar'); print(f'RAR file opened. Files: {len(rf.namelist())}'); print(f'First 20 files: {rf.namelist()[:20]}'); rf.extractall('.'); print('Extraction complete!'); items = sorted(os.listdir('.')); print(f'Extracted: {len([f for f in items if os.path.isfile(f)])} files, {len([d for d in items if os.path.isdir(d)])} dirs'); [print(f' {item}') for item in items]" 2>&1 | tee /tmp/extract.log || true; \
+    else \
+        echo "ERROR: No extraction tool available!" && exit 1; \
+    fi && \
+    echo "" && \
+    echo "Checking extraction results..." && \
+    if [ -f "/tmp/extract.log" ]; then \
+        echo "Extraction log (last 50 lines):"; \
+        tail -50 /tmp/extract.log; \
+    fi && \
+    echo "" && \
+    echo "==========================================" && \
+    echo "🔍 DEBUG: Checking extraction results" && \
+    echo "==========================================" && \
+    echo "Current directory: $(pwd)" && \
+    echo "All files and directories extracted:" && \
+    find . -type f -o -type d | sort | head -50 && \
+    echo "" && \
+    echo "File count: $(find . -type f | wc -l)" && \
+    echo "Directory count: $(find . -type d | wc -l)" && \
+    echo "" && \
+    echo "Looking for key files/folders..." && \
+    echo "Has npc folder: $([ -d "npc" ] && echo "YES" || echo "NO")" && \
+    echo "Has index.html: $([ -f "index.html" ] && echo "YES" || echo "NO")" && \
+    echo "Has npc/index.html: $([ -f "npc/index.html" ] && echo "YES" || echo "NO")" && \
+    echo "Has Build folder: $([ -d "Build" ] && echo "YES" || echo "NO")" && \
+    echo "Has npc/Build folder: $([ -d "npc/Build" ] && echo "YES" || echo "NO")" && \
+    echo "" && \
+    if [ -d "npc" ]; then \
+        echo "✅ Found npc folder in extraction"; \
+        echo "Contents of npc folder:"; \
+        ls -lah npc/; \
+        echo ""; \
+        echo "Copying only required Unity WebGL files..."; \
+        if [ -d "npc/Build" ]; then \
+            ORIGINAL_COUNT=$(find npc/Build -type f | wc -l) && \
+            echo "Build directory contains $ORIGINAL_COUNT files" && \
+            echo "Copying entire Build directory to /app/public/unity/npc/..."; \
+            cp -a npc/Build /app/public/unity/npc/ && \
+            COPIED_COUNT=$(find /app/public/unity/npc/Build -type f | wc -l) && \
+            echo "Verification: Original=$ORIGINAL_COUNT files, Copied=$COPIED_COUNT files" && \
+            if [ "$COPIED_COUNT" -ne "$ORIGINAL_COUNT" ]; then \
+                echo "⚠️ WARNING: File count mismatch! Trying alternative copy method..."; \
+                rm -rf /app/public/unity/npc/Build && \
+                (cd npc && tar cf - Build | (cd /app/public/unity/npc && tar xf -)) && \
+                COPIED_COUNT=$(find /app/public/unity/npc/Build -type f | wc -l) && \
+                echo "After tar copy: $COPIED_COUNT files"; \
+            fi && \
+            echo "✅ Build directory copied successfully"; \
+        else \
+            echo "❌ ERROR: Build directory not found in npc/"; \
+            exit 1; \
+        fi && \
+        if [ -d "npc/TemplateData" ]; then \
+            cp -r npc/TemplateData /app/public/unity/npc/ && \
+            echo "✅ TemplateData directory copied"; \
+        fi && \
+        if [ -f "npc/index.html" ]; then \
+            cp npc/index.html /app/public/unity/npc/ && \
+            echo "✅ index.html copied"; \
+        else \
+            echo "❌ ERROR: index.html not found in npc/"; \
+            exit 1; \
+        fi && \
+        cp npc/logo*.png /app/public/unity/npc/ 2>/dev/null || true; \
+    elif [ -f "index.html" ] || [ -d "Build" ]; then \
+        echo "✅ Files found at root of extraction"; \
+        if [ -d "Build" ]; then \
+            ORIGINAL_COUNT=$(find Build -type f | wc -l) && \
+            echo "Build directory contains $ORIGINAL_COUNT files" && \
+            echo "Copying entire Build directory to /app/public/unity/npc/..."; \
+            cp -a Build /app/public/unity/npc/ && \
+            COPIED_COUNT=$(find /app/public/unity/npc/Build -type f | wc -l) && \
+            echo "Verification: Original=$ORIGINAL_COUNT files, Copied=$COPIED_COUNT files" && \
+            if [ "$COPIED_COUNT" -ne "$ORIGINAL_COUNT" ]; then \
+                echo "⚠️ WARNING: File count mismatch! Trying alternative copy method..."; \
+                rm -rf /app/public/unity/npc/Build && \
+                tar cf - Build | (cd /app/public/unity/npc && tar xf -) && \
+                COPIED_COUNT=$(find /app/public/unity/npc/Build -type f | wc -l) && \
+                echo "After tar copy: $COPIED_COUNT files"; \
+            fi && \
+            echo "✅ Build directory copied successfully"; \
+        else \
+            echo "❌ ERROR: Build directory not found"; \
+            exit 1; \
+        fi && \
+        if [ -d "TemplateData" ]; then \
+            cp -r TemplateData /app/public/unity/npc/ && \
+            echo "✅ TemplateData directory copied"; \
+        fi && \
+        if [ -f "index.html" ]; then \
+            cp index.html /app/public/unity/npc/ && \
+            echo "✅ index.html copied"; \
+        else \
+            echo "❌ ERROR: index.html not found"; \
+            exit 1; \
+        fi && \
+        cp logo*.png /app/public/unity/npc/ 2>/dev/null || true; \
+    else \
+        echo "⚠️ No expected structure found, listing all extracted items:"; \
+        find . -type f | head -30; \
+        find . -type d | head -20; \
+        echo "Attempting to find and copy required files..." && \
+        if [ -d "Build" ] || find . -type d -name "Build" | head -1 | xargs -I {} cp -r {} /app/public/unity/npc/ 2>/dev/null; then \
+            echo "✅ Build directory found and copied"; \
+        fi && \
+        if [ -d "TemplateData" ] || find . -type d -name "TemplateData" | head -1 | xargs -I {} cp -r {} /app/public/unity/npc/ 2>/dev/null; then \
+            echo "✅ TemplateData directory found and copied"; \
+        fi && \
+        if [ -f "index.html" ] || find . -type f -name "index.html" | head -1 | xargs -I {} cp {} /app/public/unity/npc/ 2>/dev/null; then \
+            echo "✅ index.html found and copied"; \
+        fi && \
+        find . -name "logo*.png" -type f -exec cp {} /app/public/unity/npc/ \; 2>/dev/null || true; \
+    fi && \
+    cd /app/public/unity && \
+    echo "" && \
+    echo "==========================================" && \
+    echo "🔍 DEBUG: Verifying files in target directory" && \
+    echo "==========================================" && \
+    echo "Target directory: $(pwd)/npc" && \
+    echo "Files in npc directory:" && \
+    ls -lah npc/ && \
+    echo "" && \
+    echo "File count in npc: $(find npc -type f | wc -l)" && \
+    echo "Directory count in npc: $(find npc -type d | wc -l)" && \
+    echo "" && \
+    echo "Looking for index.html: $([ -f "npc/index.html" ] && echo "✅ FOUND" || echo "❌ NOT FOUND")" && \
+    echo "Looking for Build directory: $([ -d "npc/Build" ] && echo "✅ FOUND" || echo "❌ NOT FOUND")" && \
+    if [ -d "npc/Build" ]; then \
+        echo "Build directory contents:"; \
+        ls -lah npc/Build/ | head -20; \
+    fi && \
+    cd /app && \
+    echo "" && \
+    echo "==========================================" && \
+    echo "🔍 CRITICAL: Verifying required files exist" && \
+    echo "==========================================" && \
+    if [ ! -f "public/unity/npc/index.html" ] || [ ! -d "public/unity/npc/Build" ]; then \
+        echo ""; \
+        echo "=========================================="; \
+        echo "❌ BUILD FAILED: Required Unity NPC files are missing!"; \
+        echo "=========================================="; \
+        if [ ! -f "public/unity/npc/index.html" ]; then \
+            echo "❌ ERROR: index.html is missing!"; \
+        fi; \
+        if [ ! -d "public/unity/npc/Build" ]; then \
+            echo "❌ ERROR: Build directory is missing!"; \
+        fi; \
+        echo ""; \
+        echo "The RAR file appears to be corrupted or incomplete."; \
+        echo "Expected files:"; \
+        echo " - public/unity/npc/index.html"; \
+        echo " - public/unity/npc/Build/ (directory with Unity files)"; \
+        echo ""; \
+        echo "Found files:"; \
+        find public/unity/npc -type f | head -20; \
+        echo ""; \
+        exit 1; \
+    fi && \
+    echo "✅ index.html found!" && \
+    echo "✅ Build directory found!" && \
+    echo "Checking for Unity files in Build directory..." && \
+    if [ -f "public/unity/npc/Build/yes.loader.js" ] || [ -f "public/unity/npc/Build/npc.loader.js" ]; then \
+        echo "✅ Unity loader file found!"; \
+    else \
+        echo "⚠️ WARNING: Unity loader file not found (expected yes.loader.js or npc.loader.js)"; \
+    fi && \
+    echo "✅ All required files found!" && \
+    echo "" && \
+    echo "🧹 Cleaning up temporary files..." && \
+    rm -f public/unity/npc.rar && \
+    rm -rf /tmp/extract_temp /tmp/extract.log 2>/dev/null || true && \
+    echo "Unity NPC files extraction completed to public/unity/npc/"
 
-# Download Unity NPC .rar file from Google Drive
-RUN cd public/unity && \
-    gdown "1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks" -O npc.rar
-
-# Extract Unity NPC files
-RUN cd public/unity && \
-    7z x npc.rar -o/tmp/npc_extract && \
-    cp -r /tmp/npc_extract/* npc/ && \
-    rm -f npc.rar && \
-    rm -rf /tmp/npc_extract
-
-# Build React app (Vite outputs to dist/)
+# Build the application
 RUN npm run build
 
 # ========== Stage 2: Nginx Serving ==========
