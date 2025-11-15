@@ -65,7 +65,24 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     echo "Unity NPC files extraction completed to public/unity/npc/"
 
 # Build the application
-RUN npm run build
+RUN npm run build && \
+    echo "Verifying Unity files in dist directory..." && \
+    ls -la dist/unity/npc/ 2>/dev/null || echo "⚠️ Unity files not found in dist/unity/npc/" && \
+    if [ -d "dist/unity/npc" ]; then \
+      echo "✅ Unity NPC files found in dist:"; \
+      ls -la dist/unity/npc/ | head -20; \
+      if [ -f "dist/unity/npc/index.html" ]; then \
+        echo "✅ index.html found"; \
+      fi; \
+      if [ -d "dist/unity/npc/Build" ]; then \
+        echo "✅ Build directory found"; \
+        ls -la dist/unity/npc/Build/ | head -10; \
+      fi; \
+    else \
+      echo "❌ dist/unity/npc/ directory not found!"; \
+      echo "Checking dist structure:"; \
+      find dist -name "unity" -o -name "npc" 2>/dev/null | head -10; \
+    fi
 
 # Production stage
 FROM nginx:alpine
