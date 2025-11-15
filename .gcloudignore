@@ -97,3 +97,6 @@ Makefile
 # Unity NPC files (downloaded during build)
 vite-project/public/unity/npc/
 
+# Duplicate jeelizFaceFilter directory (use src/libs version instead)
+vite-project/jeelizFaceFilter/
+
