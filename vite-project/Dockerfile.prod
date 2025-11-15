@@ -4,11 +4,14 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install tools for downloading and extracting
-# Using unrar-nonfree for RAR v5 support (7z doesn't fully support RAR v5)
-# Also install file command for file type detection and p7zip as fallback
+# Python rarfile needs unrar binary for RAR v5 support
+# Try to install unrar from edge repository, or download unrar binary manually
 RUN apk add --no-cache wget curl python3 py3-pip file p7zip && \
-    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community unrar || \
-    (echo "unrar not available, will use Python rarfile as fallback" && pip3 install --no-cache-dir --break-system-packages rarfile)
+    (apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community unrar || \
+     (echo "unrar not in repos, downloading unrar binary..." && \
+      wget -q https://www.rarlab.com/rar/unrarsrc-6.2.12.tar.gz -O /tmp/unrar.tar.gz && \
+      apk add --no-cache g++ make || true)) && \
+    pip3 install --no-cache-dir --break-system-packages rarfile
 
 # Copy package files
 COPY package*.json ./
@@ -54,14 +57,32 @@ import rarfile
 import sys
 import os
 
+# Set unrar tool path if available
+if os.path.exists('/usr/bin/unrar'):
+    rarfile.UNRAR_TOOL = '/usr/bin/unrar'
+elif os.path.exists('/usr/local/bin/unrar'):
+    rarfile.UNRAR_TOOL = '/usr/local/bin/unrar'
+else:
+    # Try to find unrar in PATH
+    import shutil
+    unrar_path = shutil.which('unrar')
+    if unrar_path:
+        rarfile.UNRAR_TOOL = unrar_path
+    else:
+        print("WARNING: unrar binary not found. Python rarfile may not work for RAR v5 files.", file=sys.stderr)
+
 try:
     rf = rarfile.RarFile('/app/public/unity/npc.rar')
     print(f"RAR file opened successfully. Number of files: {len(rf.namelist())}")
+    print(f"RAR file list (first 20): {rf.namelist()[:20]}")
     print("Extracting all files...")
     rf.extractall('.')
     print("Extraction complete!")
     print(f"Extracted files: {len([f for f in os.listdir('.') if os.path.isfile(f)])}")
     print(f"Extracted directories: {len([d for d in os.listdir('.') if os.path.isdir(d)])}")
+    print("All extracted items:")
+    for item in sorted(os.listdir('.')):
+        print(f"  {item}")
 except Exception as e:
     print(f"ERROR during extraction: {e}", file=sys.stderr)
     import traceback
