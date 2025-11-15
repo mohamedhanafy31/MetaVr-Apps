@@ -60,12 +60,19 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker
 
+      - name: Enable required APIs
+        run: |
+          gcloud services enable cloudresourcemanager.googleapis.com --quiet || echo "API may already be enabled"
+          gcloud services enable cloudbuild.googleapis.com --quiet || echo "API may already be enabled"
+          gcloud services enable run.googleapis.com --quiet || echo "API may already be enabled"
+
       - name: Grant Cloud Build Service Account permissions
         run: |
           PROJECT_NUMBER=$(gcloud projects describe ${{ env.PROJECT_ID }} --format='value(projectNumber)')
           gcloud projects add-iam-policy-binding ${{ env.PROJECT_ID }} \
             --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
-            --role="roles/run.admin" || echo "Permissions may already be set"
+            --role="roles/run.admin" \
+            --condition=None || echo "Permissions may already be set"
 
       - name: Submit to Cloud Build
         run: |
