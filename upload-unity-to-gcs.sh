@@ -126,11 +126,64 @@ find "$UNITY_BUILD_DIR" -name "*.js" -type f ! -name "*.gz" | while read -r file
            cp "$file" "gs://$BUCKET_NAME/unity/npc/Build/$filename"
 done
 
-# Upload other files (TemplateData, images, etc.)
-echo "5. Uploading other files..."
-if [ -d "$UNITY_BUILD_DIR/TemplateData" ]; then
-    echo "   Uploading TemplateData directory..."
+# Upload TemplateData directory (usually in parent directory, not Build/)
+echo "5. Uploading TemplateData directory..."
+NPC_PARENT_DIR="$(dirname "$UNITY_BUILD_DIR")"
+if [ -d "$NPC_PARENT_DIR/TemplateData" ]; then
+    echo "   Found TemplateData in parent directory..."
+    gsutil -m cp -r "$NPC_PARENT_DIR/TemplateData" "gs://$BUCKET_NAME/unity/npc/"
+elif [ -d "$UNITY_BUILD_DIR/TemplateData" ]; then
+    echo "   Found TemplateData in Build directory..."
     gsutil -m cp -r "$UNITY_BUILD_DIR/TemplateData" "gs://$BUCKET_NAME/unity/npc/Build/"
+else
+    echo "   ⚠️ TemplateData directory not found (may cause 404 errors)"
+fi
+
+# Upload index.html if it exists in parent directory
+echo "6. Uploading index.html..."
+if [ -f "$NPC_PARENT_DIR/index.html" ]; then
+    echo "   Found index.html in parent directory..."
+    gsutil -h "Content-Type:text/html" \
+           cp "$NPC_PARENT_DIR/index.html" "gs://$BUCKET_NAME/unity/npc/index.html"
+else
+    echo "   ⚠️ index.html not found (may cause 404 errors)"
+fi
+
+# Upload logo files (logo1.png, logo2.png, etc.)
+echo "7. Uploading logo and image files..."
+find "$NPC_PARENT_DIR" -maxdepth 1 -type f \( -name "logo*.png" -o -name "logo*.jpg" -o -name "favicon.ico" -o -name "*.css" \) 2>/dev/null | while read -r file; do
+    filename=$(basename "$file")
+    ext="${filename##*.}"
+    case "$ext" in
+      png) content_type="image/png" ;;
+      jpg|jpeg) content_type="image/jpeg" ;;
+      ico) content_type="image/x-icon" ;;
+      css) content_type="text/css" ;;
+      *) content_type="application/octet-stream" ;;
+    esac
+    echo "   Uploading $filename ($content_type)..."
+    gsutil -h "Content-Type:$content_type" \
+           cp "$file" "gs://$BUCKET_NAME/unity/npc/$filename"
+done || echo "   No logo/image files found"
+
+# Upload all other files from npc directory (style.css, etc.)
+echo "8. Uploading other files from npc directory..."
+if [ -d "$NPC_PARENT_DIR" ]; then
+    find "$NPC_PARENT_DIR" -maxdepth 1 -type f ! -name "*.rar" ! -name "*.zip" 2>/dev/null | while read -r file; do
+        filename=$(basename "$file")
+        # Skip if already uploaded
+        if [[ "$filename" != "index.html" ]] && [[ ! "$filename" =~ ^logo ]] && [[ "$filename" != "favicon.ico" ]]; then
+            ext="${filename##*.}"
+            case "$ext" in
+              css) content_type="text/css" ;;
+              json) content_type="application/json" ;;
+              *) content_type="application/octet-stream" ;;
+            esac
+            echo "   Uploading $filename ($content_type)..."
+            gsutil -h "Content-Type:$content_type" \
+                   cp "$file" "gs://$BUCKET_NAME/unity/npc/$filename"
+        fi
+    done || echo "   No additional files found"
 fi
 
 # Upload index.html if it exists in parent directory
