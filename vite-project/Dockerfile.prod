@@ -4,9 +4,11 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install tools for downloading and extracting
-# Using p7zip instead of unrar (unrar not available in Alpine)
-# Also install file command for file type detection
-RUN apk add --no-cache wget p7zip curl python3 py3-pip file
+# Using unrar-nonfree for RAR v5 support (7z doesn't fully support RAR v5)
+# Also install file command for file type detection and p7zip as fallback
+RUN apk add --no-cache wget curl python3 py3-pip file p7zip && \
+    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community unrar || \
+    (echo "unrar not available, will use Python rarfile as fallback" && pip3 install --no-cache-dir --break-system-packages rarfile)
 
 # Copy package files
 COPY package*.json ./
@@ -20,6 +22,7 @@ COPY . .
 # Download and extract Unity NPC files from Google Drive
 # File ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
 # Using gdown for reliable large file downloads from Google Drive
+# Using unrar for RAR v5 support (7z doesn't fully support RAR v5)
 # Extract to public/unity/npc/ directory
 RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     mkdir -p public/unity/npc && \
@@ -41,7 +44,16 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     mkdir -p /tmp/extract_temp && \
     cd /tmp/extract_temp && \
     echo "DEBUG: Extracting from $(pwd)" && \
-    7z x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || true && \
+    if command -v unrar >/dev/null 2>&1; then \
+      echo "Using unrar for extraction..." && \
+      unrar x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || (echo "unrar failed, trying Python rarfile..." && python3 -c "import rarfile; rf = rarfile.RarFile('/app/public/unity/npc.rar'); rf.extractall('.'); print('Extraction complete')" 2>&1 | tee -a /tmp/extract.log || true); \
+    elif python3 -c "import rarfile" 2>/dev/null; then \
+      echo "Using Python rarfile for extraction..." && \
+      python3 -c "import rarfile; rf = rarfile.RarFile('/app/public/unity/npc.rar'); rf.extractall('.'); print('Extraction complete')" 2>&1 | tee /tmp/extract.log || true; \
+    else \
+      echo "Using 7z as fallback (may not fully support RAR v5)..." && \
+      7z x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || true; \
+    fi && \
     echo "" && \
     echo "==========================================" && \
     echo "🔍 DEBUG: Checking extraction results" && \
@@ -190,8 +202,8 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
       ls -lah public/unity/ 2>/dev/null || echo "public/unity/ does not exist"; \
     fi && \
     echo "==========================================" && \
-    pip3 uninstall -y --break-system-packages gdown && \
-    apk del python3 py3-pip p7zip && \
+    pip3 uninstall -y --break-system-packages gdown rarfile 2>/dev/null || true && \
+    apk del python3 py3-pip p7zip unrar 2>/dev/null || true && \
     echo "Unity NPC files extraction completed to public/unity/npc/"
 
 # Build the application
