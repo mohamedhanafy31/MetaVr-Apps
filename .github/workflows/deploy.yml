@@ -20,22 +20,153 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: 🔐 Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Set up Cloud SDK
+      - name: ⚙️ Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      - name: Submit build to Cloud Build
+      - name: 📊 Analyze files for upload
         run: |
+          echo "=========================================="
+          echo "📊 Preparing Source Files"
+          echo "=========================================="
+          echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')"
+          echo ""
+          echo "🔍 Analyzing files to be uploaded..."
+          
+          # Count files (excluding .git and node_modules)
+          FILE_COUNT=$(find . -type f \
+            -not -path './.git/*' \
+            -not -path '*/node_modules/*' \
+            -not -path '*/dist/*' \
+            -not -path '*/build/*' \
+            -not -path '*/.next/*' \
+            2>/dev/null | wc -l | tr -d ' ')
+          
+          # Calculate total size
+          TOTAL_SIZE=$(find . -type f \
+            -not -path './.git/*' \
+            -not -path '*/node_modules/*' \
+            -not -path '*/dist/*' \
+            -not -path '*/build/*' \
+            -not -path '*/.next/*' \
+            2>/dev/null -exec du -ch {} + | tail -1 | cut -f1)
+          
+          echo "📁 Files to archive: ${FILE_COUNT}"
+          echo "💾 Estimated size: ${TOTAL_SIZE}"
+          echo ""
+          echo "ℹ️  Note: Actual archive may be smaller due to compression"
+          echo ""
+
+      - name: 🚀 Submit build to Cloud Build
+        run: |
+          echo "=========================================="
+          echo "🚀 Starting Deployment Process"
+          echo "=========================================="
+          echo "📋 Project: ${{ env.PROJECT_ID }}"
+          echo "📦 Service: ${{ env.SERVICE_NAME }}"
+          echo "🌍 Region: ${{ env.REGION }}"
+          echo "🔖 Commit: ${{ github.sha }}"
+          echo "=========================================="
+          echo ""
+          
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "📌 Using image tag: ${SHORT_SHA}"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📦 Phase 1: Creating Archive & Uploading"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')"
+          echo ""
+          echo "📝 Creating temporary archive..."
+          echo "⏳ This may take a moment depending on file count..."
+          echo "📤 Uploading to Google Cloud Storage..."
+          echo "   (Progress will be shown below)"
+          echo ""
+          
+          # Submit build and capture output with progress tracking
           gcloud builds submit --config cloudbuild.yaml \
-            --substitutions=COMMIT_SHA=${{ github.sha }},SHORT_SHA=${SHORT_SHA}
+            --substitutions=COMMIT_SHA=${{ github.sha }},SHORT_SHA=${SHORT_SHA} 2>&1 | \
+          while IFS= read -r line || [ -n "$line" ]; do
+            # Highlight archive creation with file count and size
+            if echo "$line" | grep -q "Creating temporary archive"; then
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "📦 ARCHIVE CREATION"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              # Extract and highlight file count and size
+              if echo "$line" | grep -qE "[0-9]+ file\(s\)"; then
+                FILE_INFO=$(echo "$line" | grep -oE "[0-9]+ file\(s\) totalling [0-9.]+ [KMGT]?i?B")
+                echo "📦 $FILE_INFO"
+                echo "⏳ Compressing files..."
+              else
+                echo "📦 $line"
+              fi
+            # Highlight upload progress with GCS path
+            elif echo "$line" | grep -q "Uploading tarball"; then
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "📤 UPLOADING TO CLOUD STORAGE"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              # Extract GCS path
+              GCS_PATH=$(echo "$line" | grep -oE "gs://[^]]+")
+              if [ -n "$GCS_PATH" ]; then
+                echo "📤 Destination: $GCS_PATH"
+              else
+                echo "📤 $line"
+              fi
+              echo "⏳ Upload in progress... (this may take a while for large archives)"
+            # Show build phase transition
+            elif echo "$line" | grep -qE "^━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$"; then
+              echo "$line"
+            # Show build steps with better formatting
+            elif echo "$line" | grep -qE "^(Step|Pulling|Pushing|Building|Running)"; then
+              echo ""
+              echo "🔨 $line"
+            # Show status updates
+            elif echo "$line" | grep -qE "(SUCCESS|FAILURE|ERROR)"; then
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              if echo "$line" | grep -q "SUCCESS"; then
+                echo "✅ $line"
+              elif echo "$line" | grep -q "FAILURE\|ERROR"; then
+                echo "❌ $line"
+              else
+                echo "$line"
+              fi
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            # Show build ID
+            elif echo "$line" | grep -qi "ID:"; then
+              echo ""
+              echo "🆔 $line"
+            # Pass through other lines
+            else
+              echo "$line"
+            fi
+          done | tee /tmp/build-output.log
+          
+          # Extract build ID from output (if available)
+          BUILD_ID=$(grep -i "ID:" /tmp/build-output.log | tail -1 | awk '{print $NF}' || echo "")
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "✅ Build completed!"
+          if [ -n "$BUILD_ID" ]; then
+            echo "🔗 Build ID: ${BUILD_ID}"
+            echo "📊 View details: https://console.cloud.google.com/cloud-build/builds/${BUILD_ID}?project=${{ env.PROJECT_ID }}"
+          fi
+          
+          echo ""
+          echo "=========================================="
+          echo "✅ Deployment process completed!"
+          echo "=========================================="
 

@@ -1,6 +1,6 @@
 substitutions:
-  SHORT_SHA: ''
-  COMMIT_SHA: ''
+  _SHORT_SHA: ''
+  _COMMIT_SHA: ''
 
 steps:
   # Determine SHORT_SHA: use provided SHORT_SHA, or extract from COMMIT_SHA, or use BUILD_ID
@@ -9,18 +9,30 @@ steps:
     args:
       - '-c'
       - |
-        if [ -n "$$SHORT_SHA" ]; then
-          TAG=$$SHORT_SHA
-        elif [ -n "$$COMMIT_SHA" ]; then
-          TAG=$${COMMIT_SHA:0:7}
+        echo "=========================================="
+        echo "📋 Step 1/5: Preparing Build Configuration"
+        echo "=========================================="
+        echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+        
+        if [ -n "$$_SHORT_SHA" ]; then
+          TAG=$$_SHORT_SHA
+          echo "✅ Using provided SHORT_SHA: $$TAG"
+        elif [ -n "$$_COMMIT_SHA" ]; then
+          TAG=$${_COMMIT_SHA:0:7}
+          echo "✅ Extracted tag from COMMIT_SHA: $$TAG"
         else
           TAG=$${BUILD_ID:0:7}
+          echo "✅ Using BUILD_ID as fallback: $$TAG"
         fi
-        echo "Using tag: $$TAG"
+        
+        echo "📌 Final image tag: $$TAG"
         echo "$$TAG" > /workspace/image-tag.txt
+        echo "✅ Configuration saved"
+        echo ""
     env:
-      - 'SHORT_SHA=${SHORT_SHA}'
-      - 'COMMIT_SHA=${COMMIT_SHA}'
+      - '_SHORT_SHA=${_SHORT_SHA}'
+      - '_COMMIT_SHA=${_COMMIT_SHA}'
       - 'BUILD_ID=${BUILD_ID}'
 
   # Build the container image
@@ -29,12 +41,31 @@ steps:
     args:
       - '-c'
       - |
+        echo "=========================================="
+        echo "🔨 Step 2/5: Building Docker Image"
+        echo "=========================================="
+        echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+        
         TAG=$$(cat /workspace/image-tag.txt)
+        IMAGE_TAG=gcr.io/$$PROJECT_ID/metavr-frontend:$$TAG
+        IMAGE_LATEST=gcr.io/$$PROJECT_ID/metavr-frontend:latest
+        
+        echo "📦 Building image: $$IMAGE_TAG"
+        echo "📦 Also tagging as: $$IMAGE_LATEST"
+        echo "⏳ This may take a few minutes..."
+        echo ""
+        
         docker build \
-          -t gcr.io/$$PROJECT_ID/metavr-frontend:$$TAG \
-          -t gcr.io/$$PROJECT_ID/metavr-frontend:latest \
+          -t $$IMAGE_TAG \
+          -t $$IMAGE_LATEST \
           -f vite-project/Dockerfile.prod \
           vite-project
+        
+        echo ""
+        echo "✅ Docker image built successfully!"
+        echo "📦 Image: $$IMAGE_TAG"
+        echo ""
     env:
       - 'PROJECT_ID=${PROJECT_ID}'
 
@@ -44,15 +75,51 @@ steps:
     args:
       - '-c'
       - |
+        echo "=========================================="
+        echo "📤 Step 3/5: Pushing Docker Image (Tagged)"
+        echo "=========================================="
+        echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+        
         TAG=$$(cat /workspace/image-tag.txt)
-        docker push gcr.io/$$PROJECT_ID/metavr-frontend:$$TAG
+        IMAGE_TAG=gcr.io/$$PROJECT_ID/metavr-frontend:$$TAG
+        
+        echo "📤 Pushing: $$IMAGE_TAG"
+        echo "⏳ Uploading to Container Registry..."
+        echo ""
+        
+        docker push $$IMAGE_TAG
+        
+        echo ""
+        echo "✅ Image pushed successfully!"
+        echo ""
     env:
       - 'PROJECT_ID=${PROJECT_ID}'
 
   - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
     args:
-      - 'push'
-      - 'gcr.io/$PROJECT_ID/metavr-frontend:latest'
+      - '-c'
+      - |
+        echo "=========================================="
+        echo "📤 Step 4/5: Pushing Docker Image (Latest)"
+        echo "=========================================="
+        echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+        
+        IMAGE_LATEST=gcr.io/$$PROJECT_ID/metavr-frontend:latest
+        
+        echo "📤 Pushing: $$IMAGE_LATEST"
+        echo "⏳ Uploading to Container Registry..."
+        echo ""
+        
+        docker push $$IMAGE_LATEST
+        
+        echo ""
+        echo "✅ Latest image pushed successfully!"
+        echo ""
+    env:
+      - 'PROJECT_ID=${PROJECT_ID}'
 
   # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -60,9 +127,25 @@ steps:
     args:
       - '-c'
       - |
+        echo "=========================================="
+        echo "🚀 Step 5/5: Deploying to Cloud Run"
+        echo "=========================================="
+        echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+        
         TAG=$$(cat /workspace/image-tag.txt)
+        IMAGE_TAG=gcr.io/$$PROJECT_ID/metavr-frontend:$$TAG
+        
+        echo "🌍 Service: metavr-frontend"
+        echo "📍 Region: us-central1"
+        echo "📦 Image: $$IMAGE_TAG"
+        echo "💾 Memory: 512Mi"
+        echo "⚡ CPU: 1"
+        echo "⏳ Deploying..."
+        echo ""
+        
         gcloud run deploy metavr-frontend \
-          --image gcr.io/$$PROJECT_ID/metavr-frontend:$$TAG \
+          --image $$IMAGE_TAG \
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated \
@@ -71,7 +154,15 @@ steps:
           --cpu 1 \
           --min-instances 0 \
           --max-instances 10 \
-          --timeout 300
+          --timeout 300 \
+          --format="value(status.url)"
+        
+        echo ""
+        echo "=========================================="
+        echo "✅ Deployment completed successfully!"
+        echo "=========================================="
+        echo "⏰ $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
     env:
       - 'PROJECT_ID=${PROJECT_ID}'
 
