@@ -202,7 +202,8 @@ jobs:
           
           # Upload other files
           echo "Uploading other files..."
-          for file in "$BUILD_DIR"/*.js "$BUILD_DIR"/*.json "$BUILD_DIR"/*.png "$BUILD_DIR"/*.jpg 2>/dev/null; do
+          # Use find to avoid glob expansion issues
+          find "$BUILD_DIR" -maxdepth 1 -type f \( -name "*.js" -o -name "*.json" -o -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \) 2>/dev/null | while read -r file; do
             if [ -f "$file" ] && [[ "$file" != *"loader.js" ]] && [[ "$file" != *".gz" ]]; then
               filename=$(basename "$file")
               ext="${filename##*.}"
@@ -217,7 +218,7 @@ jobs:
               gsutil -h "Content-Type:$content_type" \
                      cp "$file" "gs://$BUCKET_NAME/unity/npc/Build/$filename"
             fi
-          done
+          done || echo "No additional files to upload"
           
           echo ""
           echo "✅ Upload complete!"
