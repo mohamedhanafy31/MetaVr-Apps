@@ -186,13 +186,6 @@ if [ -d "$NPC_PARENT_DIR" ]; then
     done || echo "   No additional files found"
 fi
 
-# Upload index.html if it exists in parent directory
-if [ -f "$(dirname "$UNITY_BUILD_DIR")/index.html" ]; then
-    echo "   Uploading index.html..."
-    gsutil -h "Content-Type:text/html" \
-           cp "$(dirname "$UNITY_BUILD_DIR")/index.html" "gs://$BUCKET_NAME/unity/npc/index.html"
-fi
-
 echo ""
 echo "=========================================="
 echo "✅ Upload complete!"
