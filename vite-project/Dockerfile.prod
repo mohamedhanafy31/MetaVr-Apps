@@ -30,39 +30,36 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     ls -lh npc.rar && \
     FILE_TYPE=$(file npc.rar 2>/dev/null || echo "unknown") && \
     echo "File type: $FILE_TYPE" && \
-    echo "Extracting npc.rar to npc/ directory..." && \
-    7z x npc.rar -onpc -y 2>&1 | tee /tmp/extract.log || true && \
-    echo "Checking extraction result..." && \
-    echo "Current directory (should be public/unity): $(pwd)" && \
-    echo "Current directory structure:" && \
-    ls -la . && \
-    echo "Checking npc directory..." && \
+    echo "Extracting npc.rar to temporary directory..." && \
+    mkdir -p /tmp/extract_temp && \
+    cd /tmp/extract_temp && \
+    7z x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || true && \
+    echo "Checking what was extracted..." && \
+    echo "Extracted files structure:" && \
+    find . -type f -o -type d | head -30 && \
+    echo "" && \
+    echo "Looking for npc folder or files..." && \
     if [ -d "npc" ]; then \
-      echo "✅ npc directory found in $(pwd)/npc" && \
-      cd npc && \
-      EXTRACTED_COUNT=$(ls -A . 2>/dev/null | wc -l) && \
-      echo "Files in npc/ directory: $EXTRACTED_COUNT" && \
-      ls -lah . | head -20 || true; \
-      if [ -d "Build" ] || [ -f "index.html" ]; then \
-        echo "✅ Files extracted successfully to npc/ directory"; \
-        if [ -d "Build" ]; then \
-          echo "✅ Build directory found"; \
-          ls -lah Build/ | head -10 || true; \
-        fi; \
-      elif [ -d "npc" ]; then \
-        echo "⚠️ Nested npc folder detected, moving files up..." && \
-        mv npc/* . 2>/dev/null || true; \
-        mv npc/.* . 2>/dev/null || true; \
-        rmdir npc 2>/dev/null || true; \
-        echo "✅ Files moved to correct location"; \
-        ls -lah . | head -20 || true; \
-      fi; \
-      cd ..; \
+      echo "✅ Found npc folder in extraction"; \
+      echo "Contents of npc folder:"; \
+      ls -lah npc/ | head -20; \
+      echo "Moving npc folder contents to target location..."; \
+      cp -r npc/* /app/public/unity/npc/ 2>/dev/null || true; \
+      cp -r npc/.* /app/public/unity/npc/ 2>/dev/null || true; \
+    elif [ -f "index.html" ] || [ -d "Build" ]; then \
+      echo "✅ Files found at root of extraction"; \
+      echo "Moving files to target location..."; \
+      cp -r * /app/public/unity/npc/ 2>/dev/null || true; \
+      cp -r .* /app/public/unity/npc/ 2>/dev/null || true; \
     else \
-      echo "❌ npc directory not found after extraction!"; \
-      echo "Listing all extracted files:"; \
-      find . -maxdepth 2 -type f -o -type d | head -20; \
+      echo "⚠️ Checking all extracted files..."; \
+      find . -type f | head -20; \
+      echo "Copying all extracted files to target..."; \
+      cp -r * /app/public/unity/npc/ 2>/dev/null || true; \
     fi && \
+    cd /app/public/unity && \
+    echo "Verifying files in npc directory..." && \
+    ls -lah npc/ | head -20 && \
     cd /app && \
     echo "Now in /app, verifying public/unity/npc structure..." && \
     rm -f public/unity/npc.rar && \
