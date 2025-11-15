@@ -1,61 +1,312 @@
-# ================================
-# 1) FRONTEND BUILD STAGE
-# ================================
+# Multi-stage Dockerfile for Frontend Production Build
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install required tools
-# unrar is in Alpine edge repository
-RUN apk add --no-cache python3 py3-pip wget && \
-    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community unrar || \
-    (echo "unrar not available, will try alternative extraction method" && apk add --no-cache p7zip)
+# Install tools for downloading and extracting
+# Using wget for Google Drive downloads (more reliable than gdown, no Python needed)
+# Try to install unrar from edge repository, or download unrar binary manually
+# Python rarfile is kept as fallback for extraction if unrar fails
+RUN apk add --no-cache wget curl file p7zip && \
+    (apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community unrar || \
+    (echo "unrar not in repos, will use Python rarfile as fallback..." && \
+    apk add --no-cache python3 py3-pip && \
+    pip3 install --no-cache-dir --break-system-packages rarfile || true))
 
-# Install gdown
-RUN pip3 install --no-cache-dir gdown
-
-# Install frontend dependencies
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm ci
 
-# Copy source
+# Copy application files
 COPY . .
 
-# ================================
-# 2) DOWNLOAD + EXTRACT NPC FILES
-# ================================
+# Download and extract Unity NPC files from Google Drive
+# File ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
+# Using wget for direct Google Drive downloads (lightweight, no Python dependency)
+# Handles large files with virus scan warning by extracting confirmation token
+# Using unrar for RAR v5 support (7z doesn't fully support RAR v5)
+# Extract to public/unity/npc/ directory
 RUN mkdir -p public/unity/npc && \
-    echo "Downloading RAR file..." && \
-    gdown --id 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks -O /app/public/unity/npc/npc.rar && \
-    echo "Extracting..." && \
-    if command -v unrar >/dev/null 2>&1; then \
-      unrar x /app/public/unity/npc/npc.rar /app/public/unity/npc/; \
-    elif command -v 7z >/dev/null 2>&1; then \
-      cd /app/public/unity/npc && 7z x npc.rar -y && \
-      if [ -d "npc" ]; then mv npc/* . && rmdir npc; fi; \
+    cd public/unity && \
+    echo "Downloading Unity NPC files from Google Drive..." && \
+    FILE_ID="1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks" && \
+    echo "File ID: $FILE_ID" && \
+    echo "Step 1: Attempting download (handles both small and large files)..." && \
+    wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate \
+        "https://drive.google.com/uc?export=download&id=$FILE_ID" -O /tmp/temp_download && \
+    if file /tmp/temp_download | grep -q "HTML\|text"; then \
+        echo "Large file detected (got warning page), extracting confirmation token..." && \
+        CONFIRM_TOKEN=$(sed -n 's/.*confirm=\([^&]*\).*/\1/p' /tmp/temp_download | head -1) && \
+        rm -f /tmp/temp_download && \
+        echo "Step 2: Downloading with confirmation token..." && \
+        wget --quiet --show-progress --load-cookies /tmp/cookies.txt --no-check-certificate \
+            "https://drive.google.com/uc?export=download&confirm=$CONFIRM_TOKEN&id=$FILE_ID" -O npc.rar; \
     else \
-      echo "ERROR: No extraction tool available!" && exit 1; \
+        echo "Small file detected, using direct download..." && \
+        mv /tmp/temp_download npc.rar; \
     fi && \
-    rm /app/public/unity/npc/npc.rar && \
-    echo "Extraction Complete" && \
-    ls -lah /app/public/unity/npc
+    rm -f /tmp/cookies.txt /tmp/temp_download && \
+    echo "Verifying downloaded file..." && \
+    ls -lh npc.rar && \
+    FILE_TYPE=$(file npc.rar 2>/dev/null || echo "unknown") && \
+    echo "File type: $FILE_TYPE" && \
+    echo "==========================================" && \
+    echo "🔍 DEBUG: Starting RAR extraction process" && \
+    echo "==========================================" && \
+    echo "RAR file location: /app/public/unity/npc.rar" && \
+    echo "RAR file size: $(ls -lh /app/public/unity/npc.rar | awk '{print $5}')" && \
+    echo "Target directory: /app/public/unity/npc/" && \
+    echo "" && \
+    echo "Extracting npc.rar to temporary directory..." && \
+    mkdir -p /tmp/extract_temp && \
+    cd /tmp/extract_temp && \
+    echo "DEBUG: Extracting from $(pwd)" && \
+    if command -v unrar >/dev/null 2>&1; then \
+        echo "Using unrar for extraction..." && \
+        unrar x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || (echo "unrar failed, trying Python rarfile..." && python3 -c "import rarfile; rf = rarfile.RarFile('/app/public/unity/npc.rar'); rf.extractall('.'); print('Extraction complete')" 2>&1 | tee -a /tmp/extract.log || true); \
+    elif python3 -c "import rarfile" 2>/dev/null; then \
+        echo "Using Python rarfile for extraction..." && \
+        python3 -c "import rarfile, sys, os, shutil; unrar_path = None; unrar_path = '/usr/bin/unrar' if os.path.exists('/usr/bin/unrar') else ('/usr/local/bin/unrar' if os.path.exists('/usr/local/bin/unrar') else shutil.which('unrar')); rarfile.UNRAR_TOOL = unrar_path if unrar_path else None; print('WARNING: unrar binary not found', file=sys.stderr) if not unrar_path else None; rf = rarfile.RarFile('/app/public/unity/npc.rar'); print(f'RAR file opened. Files: {len(rf.namelist())}'); print(f'First 20 files: {rf.namelist()[:20]}'); rf.extractall('.'); print('Extraction complete!'); items = sorted(os.listdir('.')); print(f'Extracted: {len([f for f in items if os.path.isfile(f)])} files, {len([d for d in items if os.path.isdir(d)])} dirs'); [print(f' {item}') for item in items]" 2>&1 | tee /tmp/extract.log || true; \
+    else \
+        echo "Using 7z as fallback (may not fully support RAR v5)..." && \
+        7z x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || true; \
+    fi && \
+    echo "" && \
+    echo "Checking extraction results..." && \
+    if [ -f "/tmp/extract.log" ]; then \
+        echo "Extraction log (last 50 lines):"; \
+        tail -50 /tmp/extract.log; \
+    fi && \
+    echo "" && \
+    echo "==========================================" && \
+    echo "🔍 DEBUG: Checking extraction results" && \
+    echo "==========================================" && \
+    echo "Current directory: $(pwd)" && \
+    echo "All files and directories extracted:" && \
+    find . -type f -o -type d | sort | head -50 && \
+    echo "" && \
+    echo "File count: $(find . -type f | wc -l)" && \
+    echo "Directory count: $(find . -type d | wc -l)" && \
+    echo "" && \
+    echo "Looking for key files/folders..." && \
+    echo "Has npc folder: $([ -d "npc" ] && echo "YES" || echo "NO")" && \
+    echo "Has index.html: $([ -f "index.html" ] && echo "YES" || echo "NO")" && \
+    echo "Has npc/index.html: $([ -f "npc/index.html" ] && echo "YES" || echo "NO")" && \
+    echo "Has Build folder: $([ -d "Build" ] && echo "YES" || echo "NO")" && \
+    echo "Has npc/Build folder: $([ -d "npc/Build" ] && echo "YES" || echo "NO")" && \
+    echo "" && \
+    echo "All extracted files and directories:" && \
+    find . -type f -o -type d | sort && \
+    echo "" && \
+    if [ -d "npc" ]; then \
+        echo "✅ Found npc folder in extraction"; \
+        echo "Contents of npc folder:"; \
+        ls -lah npc/; \
+        echo ""; \
+        echo "All files in npc folder:"; \
+        find npc -type f; \
+        echo ""; \
+        echo "All directories in npc folder:"; \
+        find npc -type d; \
+        echo ""; \
+        echo "Moving npc folder contents to target location..."; \
+        cp -r npc/* /app/public/unity/npc/ 2>&1 || echo "Copy failed, trying alternative..."; \
+        cp -r npc/.??* /app/public/unity/npc/ 2>&1 || true; \
+    elif [ -f "index.html" ] || [ -d "Build" ]; then \
+        echo "✅ Files found at root of extraction"; \
+        echo "Root files:"; \
+        ls -lah .; \
+        echo "Moving files to target location..."; \
+        cp -r * /app/public/unity/npc/ 2>&1 || echo "Copy failed"; \
+        cp -r .??* /app/public/unity/npc/ 2>&1 || true; \
+    else \
+        echo "⚠️ No expected structure found, listing all extracted items:"; \
+        find . -type f | head -30; \
+        find . -type d | head -20; \
+        echo "Attempting to copy everything to target..."; \
+        cp -r * /app/public/unity/npc/ 2>&1 || echo "Copy failed"; \
+    fi && \
+    cd /app/public/unity && \
+    echo "" && \
+    echo "==========================================" && \
+    echo "🔍 DEBUG: Verifying files in target directory" && \
+    echo "==========================================" && \
+    echo "Target directory: $(pwd)/npc" && \
+    echo "Files in npc directory:" && \
+    ls -lah npc/ && \
+    echo "" && \
+    echo "File count in npc: $(find npc -type f | wc -l)" && \
+    echo "Directory count in npc: $(find npc -type d | wc -l)" && \
+    echo "" && \
+    echo "Looking for index.html: $([ -f "npc/index.html" ] && echo "✅ FOUND" || echo "❌ NOT FOUND")" && \
+    echo "Looking for Build directory: $([ -d "npc/Build" ] && echo "✅ FOUND" || echo "❌ NOT FOUND")" && \
+    if [ -d "npc/Build" ]; then \
+        echo "Build directory contents:"; \
+        ls -lah npc/Build/ | head -20; \
+    fi && \
+    cd /app && \
+    echo "Now in /app, verifying public/unity/npc structure..." && \
+    echo "" && \
+    echo "==========================================" && \
+    echo "🔍 CRITICAL: Verifying required files exist" && \
+    echo "==========================================" && \
+    if [ ! -f "public/unity/npc/index.html" ] || [ ! -d "public/unity/npc/Build" ]; then \
+        echo ""; \
+        echo "=========================================="; \
+        echo "❌ BUILD FAILED: Required Unity NPC files are missing!"; \
+        echo "=========================================="; \
+        if [ ! -f "public/unity/npc/index.html" ]; then \
+            echo "❌ ERROR: index.html is missing!"; \
+        fi; \
+        if [ ! -d "public/unity/npc/Build" ]; then \
+            echo "❌ ERROR: Build directory is missing!"; \
+        fi; \
+        echo ""; \
+        echo "The RAR file appears to be corrupted or incomplete."; \
+        echo "Expected files:"; \
+        echo " - public/unity/npc/index.html"; \
+        echo " - public/unity/npc/Build/ (directory with Unity files)"; \
+        echo ""; \
+        echo "Found files:"; \
+        find public/unity/npc -type f | head -20; \
+        echo ""; \
+        echo "Please check the RAR file on Google Drive and ensure it contains:"; \
+        echo " - index.html"; \
+        echo " - Build/ directory with Unity WebGL files (yes.loader.js, yes.data.gz, etc.)"; \
+        echo " - All other required Unity assets"; \
+        echo ""; \
+        echo "The RAR file may need to be re-uploaded."; \
+        exit 1; \
+    fi && \
+    echo "✅ index.html found!" && \
+    echo "✅ Build directory found!" && \
+    echo "Checking for Unity files in Build directory..." && \
+    if [ -f "public/unity/npc/Build/yes.loader.js" ] || [ -f "public/unity/npc/Build/npc.loader.js" ]; then \
+        echo "✅ Unity loader file found!"; \
+    else \
+        echo "⚠️ WARNING: Unity loader file not found (expected yes.loader.js or npc.loader.js)"; \
+    fi && \
+    echo "✅ All required files found!" && \
+    rm -f public/unity/npc.rar && \
+    echo "==========================================" && \
+    echo "📁 VERIFYING FINAL STRUCTURE IN public/unity/npc/" && \
+    echo "==========================================" && \
+    if [ -d "public/unity/npc" ]; then \
+        echo "✅ Directory exists: public/unity/npc/" && \
+        echo "" && \
+        echo "📋 Full directory listing:" && \
+        ls -lah public/unity/npc/ && \
+        echo "" && \
+        echo "📊 File count:" && \
+        find public/unity/npc -type f | wc -l && \
+        echo "📁 Directory count:" && \
+        find public/unity/npc -type d | wc -l && \
+        echo "" && \
+        echo "🔍 Checking for key files:" && \
+        if [ -f "public/unity/npc/index.html" ]; then \
+            echo "✅ index.html found in public/unity/npc/"; \
+            ls -lh public/unity/npc/index.html; \
+        else \
+            echo "⚠️ index.html NOT found in public/unity/npc/"; \
+            echo "Looking for HTML files:"; \
+            find public/unity/npc -name "*.html" -type f || echo "No HTML files found"; \
+        fi && \
+        echo "" && \
+        if [ -d "public/unity/npc/Build" ]; then \
+            echo "✅ Build directory found in public/unity/npc/"; \
+            echo "📋 Build directory contents:" && \
+            ls -lah public/unity/npc/Build/ && \
+            echo "" && \
+            echo "🔍 Key Unity files in Build:" && \
+            ls -lh public/unity/npc/Build/*.js public/unity/npc/Build/*.wasm public/unity/npc/Build/*.data 2>/dev/null || echo "Some Unity files may be missing"; \
+        else \
+            echo "⚠️ Build directory NOT found in public/unity/npc/"; \
+            echo "Looking for Build directories:"; \
+            find public/unity/npc -type d -name "Build" || echo "No Build directory found"; \
+        fi && \
+        echo "" && \
+        echo "📂 Complete directory tree (first 3 levels):" && \
+        find public/unity/npc -maxdepth 3 -print | head -30; \
+    else \
+        echo "❌ public/unity/npc/ directory does not exist!"; \
+        echo "Checking what exists in public/unity/:" && \
+        ls -lah public/unity/ 2>/dev/null || echo "public/unity/ does not exist"; \
+    fi && \
+    echo "==========================================" && \
+    rm -f /tmp/cookies.txt /tmp/confirm_token 2>/dev/null || true && \
+    (pip3 uninstall -y --break-system-packages rarfile 2>/dev/null || true) && \
+    (apk del python3 py3-pip 2>/dev/null || true) && \
+    echo "Unity NPC files extraction completed to public/unity/npc/"
 
-# ================================
-# 3) BUILD FRONTEND
-# ================================
-RUN npm run build
+# Build the application
+RUN npm run build && \
+    echo "==========================================" && \
+    echo "📁 VERIFYING UNITY FILES IN dist DIRECTORY" && \
+    echo "==========================================" && \
+    if [ -d "dist/unity/npc" ]; then \
+        echo "✅ Directory exists: dist/unity/npc/" && \
+        echo "" && \
+        echo "📋 Full directory listing:" && \
+        ls -lah dist/unity/npc/ && \
+        echo "" && \
+        echo "📊 File count:" && \
+        find dist/unity/npc -type f | wc -l && \
+        echo "📁 Directory count:" && \
+        find dist/unity/npc -type d | wc -l && \
+        echo "" && \
+        echo "🔍 Checking for key files:" && \
+        if [ -f "dist/unity/npc/index.html" ]; then \
+            echo "✅ index.html found in dist/unity/npc/"; \
+            ls -lh dist/unity/npc/index.html; \
+        else \
+            echo "⚠️ index.html NOT found in dist/unity/npc/"; \
+            echo "Looking for HTML files:"; \
+            find dist/unity/npc -name "*.html" -type f || echo "No HTML files found"; \
+        fi && \
+        echo "" && \
+        if [ -d "dist/unity/npc/Build" ]; then \
+            echo "✅ Build directory found in dist/unity/npc/"; \
+            echo "📋 Build directory contents:" && \
+            ls -lah dist/unity/npc/Build/ && \
+            echo "" && \
+            echo "🔍 Key Unity files in Build:" && \
+            ls -lh dist/unity/npc/Build/*.js dist/unity/npc/Build/*.wasm dist/unity/npc/Build/*.data 2>/dev/null || echo "Some Unity files may be missing"; \
+        else \
+            echo "⚠️ Build directory NOT found in dist/unity/npc/"; \
+            echo "Looking for Build directories:"; \
+            find dist/unity/npc -type d -name "Build" || echo "No Build directory found"; \
+        fi && \
+        echo "" && \
+        echo "📂 Complete directory tree (first 3 levels):" && \
+        find dist/unity/npc -maxdepth 3 -print | head -30; \
+    else \
+        echo "❌ dist/unity/npc/ directory not found!" && \
+        echo "Checking dist structure:" && \
+        echo "Top-level dist contents:" && \
+        ls -lah dist/ | head -20 && \
+        echo "" && \
+        echo "Searching for unity or npc:" && \
+        find dist -name "unity" -o -name "npc" 2>/dev/null | head -20; \
+    fi && \
+    echo "=========================================="
 
-# ================================
-# 4) PRODUCTION STAGE
-# ================================
+# Production stage
 FROM nginx:alpine
 
-# Copy built app
+# Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Expose port
 EXPOSE 80
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
+
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
