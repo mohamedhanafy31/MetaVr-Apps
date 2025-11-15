@@ -111,10 +111,26 @@ RUN mkdir -p public/unity/npc && \
         ls -lah npc/; \
         echo ""; \
         echo "Copying only required Unity WebGL files (excluding node_modules, package.json, server.js)..."; \
-        echo "Copying Build directory..."; \
+        echo "Copying Build directory with ALL files..."; \
         if [ -d "npc/Build" ]; then \
-            cp -r npc/Build /app/public/unity/npc/ && \
-            echo "✅ Build directory copied"; \
+            ORIGINAL_COUNT=$(find npc/Build -type f | wc -l) && \
+            echo "Build directory contains $ORIGINAL_COUNT files" && \
+            echo "Copying entire Build directory to /app/public/unity/npc/..."; \
+            cp -a npc/Build /app/public/unity/npc/ && \
+            COPIED_COUNT=$(find /app/public/unity/npc/Build -type f | wc -l) && \
+            echo "Verification: Original=$ORIGINAL_COUNT files, Copied=$COPIED_COUNT files" && \
+            if [ "$COPIED_COUNT" -ne "$ORIGINAL_COUNT" ]; then \
+                echo "⚠️ WARNING: File count mismatch! Trying alternative copy method..."; \
+                rm -rf /app/public/unity/npc/Build && \
+                (cd npc && tar cf - Build | (cd /app/public/unity/npc && tar xf -)) && \
+                COPIED_COUNT=$(find /app/public/unity/npc/Build -type f | wc -l) && \
+                echo "After tar copy: $COPIED_COUNT files"; \
+            fi && \
+            echo "✅ Build directory copied successfully" && \
+            echo "Build directory contents:"; \
+            ls -lah /app/public/unity/npc/Build/ | head -20; \
+            echo "All files in Build:"; \
+            find /app/public/unity/npc/Build -type f | head -20; \
         else \
             echo "❌ ERROR: Build directory not found in npc/"; \
             exit 1; \
@@ -141,8 +157,20 @@ RUN mkdir -p public/unity/npc && \
         ls -lah .; \
         echo "Copying only required Unity WebGL files..."; \
         if [ -d "Build" ]; then \
-            cp -r Build /app/public/unity/npc/ && \
-            echo "✅ Build directory copied"; \
+            ORIGINAL_COUNT=$(find Build -type f | wc -l) && \
+            echo "Build directory contains $ORIGINAL_COUNT files" && \
+            echo "Copying entire Build directory to /app/public/unity/npc/..."; \
+            cp -a Build /app/public/unity/npc/ && \
+            COPIED_COUNT=$(find /app/public/unity/npc/Build -type f | wc -l) && \
+            echo "Verification: Original=$ORIGINAL_COUNT files, Copied=$COPIED_COUNT files" && \
+            if [ "$COPIED_COUNT" -ne "$ORIGINAL_COUNT" ]; then \
+                echo "⚠️ WARNING: File count mismatch! Trying alternative copy method..."; \
+                rm -rf /app/public/unity/npc/Build && \
+                tar cf - Build | (cd /app/public/unity/npc && tar xf -) && \
+                COPIED_COUNT=$(find /app/public/unity/npc/Build -type f | wc -l) && \
+                echo "After tar copy: $COPIED_COUNT files"; \
+            fi && \
+            echo "✅ Build directory copied successfully"; \
         else \
             echo "❌ ERROR: Build directory not found"; \
             exit 1; \
