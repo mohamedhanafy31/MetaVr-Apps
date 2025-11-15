@@ -25,9 +25,9 @@ env:
   GCS_BUCKET_NAME: ${{ secrets.UNITY_GCS_BUCKET_NAME || 'metavr-assets' }}
   # Google Drive file ID for Unity NPC files
   UNITY_DRIVE_FILE_ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
-  # Enable Cloud CDN (optional - requires Load Balancer, costs ~$18/month)
-  # Set to 'true' to enable CDN automatically
-  ENABLE_CDN: ${{ secrets.ENABLE_CLOUD_CDN || 'false' }}
+  # Enable Cloud CDN (always enabled - requires Load Balancer, costs ~$18/month)
+  # Cloud CDN will be automatically set up for optimal performance
+  ENABLE_CDN: 'true'
 
 jobs:
   setup-gcs-and-upload:
@@ -58,12 +58,10 @@ jobs:
         run: |
           gcloud services enable storage.googleapis.com --quiet
           gcloud services enable storage-component.googleapis.com --quiet
-          # Enable Compute API if CDN is enabled (required for Load Balancer)
-          if [ "${{ env.ENABLE_CDN }}" = "true" ]; then
-            echo "🌐 Enabling Compute API for Cloud CDN..."
-            gcloud services enable compute.googleapis.com --quiet
-            gcloud services enable cloudresourcemanager.googleapis.com --quiet
-          fi
+          # Enable Compute API for Cloud CDN (required for Load Balancer)
+          echo "🌐 Enabling Compute API for Cloud CDN..."
+          gcloud services enable compute.googleapis.com --quiet
+          gcloud services enable cloudresourcemanager.googleapis.com --quiet
 
       - name: Install extraction tools
         run: |
@@ -323,8 +321,7 @@ jobs:
           echo ""
           echo "💡 Tip: Enable Cloud CDN for even better performance (see ENABLE_CLOUD_CDN.md)"
 
-      - name: Setup Cloud CDN (Optional)
-        if: env.ENABLE_CDN == 'true'
+      - name: Setup Cloud CDN
         continue-on-error: true
         run: |
           BUCKET_NAME="${{ env.GCS_BUCKET_NAME }}"
