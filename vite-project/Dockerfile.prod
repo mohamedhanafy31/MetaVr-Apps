@@ -6,11 +6,9 @@ WORKDIR /app
 
 # Install tools for downloading and extracting
 # Debian repos have unrar, p7zip, and other extraction tools readily available
-# Using wget for Google Drive downloads (primary method)
-# gdown kept as fallback if wget fails (installed only if needed)
+# Using gdown for Google Drive downloads (reliable, handles large files automatically)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        wget \
         curl \
         file \
         p7zip-full \
@@ -19,8 +17,8 @@ RUN apt-get update && \
         python3-pip \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/* && \
-    # Install gdown as fallback (only if needed)
-    pip3 install --no-cache-dir gdown rarfile || true
+    # Install gdown for Google Drive downloads
+    pip3 install --no-cache-dir gdown rarfile
 
 # Copy package files
 COPY package*.json ./
@@ -33,8 +31,7 @@ COPY . .
 
 # Download and extract Unity NPC files from Google Drive
 # File ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
-# Using wget for direct Google Drive downloads (lightweight, no Python dependency)
-# Handles large files with virus scan warning by extracting confirmation token
+# Using gdown for reliable Google Drive downloads (handles large files automatically)
 # Using unrar for RAR v5 support (7z doesn't fully support RAR v5)
 # Extract to public/unity/npc/ directory
 RUN mkdir -p public/unity/npc && \
@@ -42,44 +39,8 @@ RUN mkdir -p public/unity/npc && \
     echo "Downloading Unity NPC files from Google Drive..." && \
     FILE_ID="1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks" && \
     echo "File ID: $FILE_ID" && \
-    echo "Step 1: Getting initial download page..." && \
-    wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate \
-        "https://drive.google.com/uc?export=download&id=$FILE_ID" -O /tmp/temp_download.html && \
-    if file /tmp/temp_download.html | grep -q "HTML\|text"; then \
-        echo "Large file detected (got warning page), extracting confirmation token..." && \
-        CONFIRM_TOKEN=$(grep -o 'confirm=[^"&]*' /tmp/temp_download.html | sed 's/confirm=//' | head -1) && \
-        if [ -z "$CONFIRM_TOKEN" ]; then \
-            CONFIRM_TOKEN=$(sed -n 's/.*confirm=\([a-zA-Z0-9_-]*\).*/\1/p' /tmp/temp_download.html | head -1); \
-        fi && \
-        if [ -z "$CONFIRM_TOKEN" ]; then \
-            CONFIRM_TOKEN=$(grep -o 'href="[^"]*confirm=[^"&]*' /tmp/temp_download.html | sed -n 's/.*confirm=\([^"&]*\).*/\1/p' | head -1); \
-        fi && \
-        echo "Extracted token: $CONFIRM_TOKEN" && \
-        if [ -z "$CONFIRM_TOKEN" ]; then \
-            echo "ERROR: Could not extract confirmation token from HTML page" && \
-            echo "HTML content (first 500 chars):" && \
-            head -c 500 /tmp/temp_download.html && \
-            exit 1; \
-        fi && \
-        rm -f /tmp/temp_download.html && \
-        echo "Step 2: Downloading with confirmation token..." && \
-        wget --quiet --show-progress --load-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate \
-            "https://drive.google.com/uc?export=download&confirm=$CONFIRM_TOKEN&id=$FILE_ID" -O npc.rar && \
-        FILE_SIZE=$(wc -c < npc.rar 2>/dev/null || echo 0) && \
-        if [ "$FILE_SIZE" -lt 10000 ] || file npc.rar | grep -q "HTML\|text"; then \
-            echo "WARNING: Still got HTML page instead of RAR file. Trying gdown as fallback..." && \
-            rm -f npc.rar && \
-            if ! command -v gdown >/dev/null 2>&1; then \
-                echo "Installing gdown as fallback..." && \
-                pip3 install --no-cache-dir gdown; \
-            fi && \
-            gdown "$FILE_ID" -O npc.rar || (echo "ERROR: Both wget and gdown failed to download the file" && exit 1); \
-        fi; \
-    else \
-        echo "Small file detected, using direct download..." && \
-        mv /tmp/temp_download.html npc.rar; \
-    fi && \
-    rm -f /tmp/cookies.txt /tmp/temp_download.html && \
+    echo "Using gdown to download file..." && \
+    gdown "$FILE_ID" -O npc.rar || (echo "ERROR: gdown failed to download the file" && exit 1) && \
     echo "Verifying downloaded file..." && \
     ls -lh npc.rar && \
     FILE_TYPE=$(file npc.rar 2>/dev/null || echo "unknown") && \
