@@ -1,6 +1,6 @@
 substitutions:
-  _SHORT_SHA: '${SHORT_SHA}'
-  _COMMIT_SHA: '${COMMIT_SHA}'
+  SHORT_SHA: ''
+  COMMIT_SHA: ''
 
 steps:
   # Determine SHORT_SHA: use provided SHORT_SHA, or extract from COMMIT_SHA, or use BUILD_ID
@@ -19,8 +19,8 @@ steps:
         echo "Using tag: $$TAG"
         echo "$$TAG" > /workspace/image-tag.txt
     env:
-      - 'SHORT_SHA=${_SHORT_SHA}'
-      - 'COMMIT_SHA=${_COMMIT_SHA}'
+      - 'SHORT_SHA=${SHORT_SHA}'
+      - 'COMMIT_SHA=${COMMIT_SHA}'
       - 'BUILD_ID=${BUILD_ID}'
 
   # Build the container image
