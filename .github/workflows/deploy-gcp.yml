@@ -25,6 +25,9 @@ env:
   GCS_BUCKET_NAME: ${{ secrets.UNITY_GCS_BUCKET_NAME || 'metavr-assets' }}
   # Google Drive file ID for Unity NPC files
   UNITY_DRIVE_FILE_ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
+  # Enable Cloud CDN (optional - requires Load Balancer, costs ~$18/month)
+  # Set to 'true' to enable CDN automatically
+  ENABLE_CDN: ${{ secrets.ENABLE_CLOUD_CDN || 'false' }}
 
 jobs:
   setup-gcs-and-upload:
@@ -55,6 +58,12 @@ jobs:
         run: |
           gcloud services enable storage.googleapis.com --quiet
           gcloud services enable storage-component.googleapis.com --quiet
+          # Enable Compute API if CDN is enabled (required for Load Balancer)
+          if [ "${{ env.ENABLE_CDN }}" = "true" ]; then
+            echo "🌐 Enabling Compute API for Cloud CDN..."
+            gcloud services enable compute.googleapis.com --quiet
+            gcloud services enable cloudresourcemanager.googleapis.com --quiet
+          fi
 
       - name: Install extraction tools
         run: |
@@ -313,6 +322,114 @@ jobs:
           echo "   https://storage.googleapis.com/$BUCKET_NAME/unity/npc/TemplateData/style.css"
           echo ""
           echo "💡 Tip: Enable Cloud CDN for even better performance (see ENABLE_CLOUD_CDN.md)"
+
+      - name: Setup Cloud CDN (Optional)
+        if: env.ENABLE_CDN == 'true'
+        continue-on-error: true
+        run: |
+          BUCKET_NAME="${{ env.GCS_BUCKET_NAME }}"
+          BACKEND_NAME="${BUCKET_NAME}-backend"
+          URL_MAP_NAME="${BUCKET_NAME}-map"
+          PROXY_NAME="${BUCKET_NAME}-proxy"
+          FORWARDING_RULE_NAME="${BUCKET_NAME}-forwarding-rule"
+          IP_NAME="${BUCKET_NAME}-ip"
+          
+          echo "=========================================="
+          echo "🌐 Setting up Cloud CDN"
+          echo "=========================================="
+          echo "Bucket: $BUCKET_NAME"
+          echo "Backend: $BACKEND_NAME"
+          echo ""
+          
+          # Check if backend bucket already exists
+          if gcloud compute backend-buckets describe "$BACKEND_NAME" --global --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+            echo "✅ Backend bucket already exists: $BACKEND_NAME"
+          else
+            echo "📦 Creating backend bucket..."
+            gcloud compute backend-buckets create "$BACKEND_NAME" \
+              --gcs-bucket-name="$BUCKET_NAME" \
+              --project="${{ env.PROJECT_ID }}" \
+              --global || echo "⚠️  Backend bucket creation failed (may already exist)"
+          fi
+          
+          # Enable Cloud CDN on backend
+          echo "🚀 Enabling Cloud CDN on backend..."
+          gcloud compute backend-buckets update "$BACKEND_NAME" \
+            --enable-cdn \
+            --project="${{ env.PROJECT_ID }}" \
+            --global || echo "⚠️  CDN enable failed (may already be enabled)"
+          
+          # Check if URL map exists
+          if gcloud compute url-maps describe "$URL_MAP_NAME" --global --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+            echo "✅ URL map already exists: $URL_MAP_NAME"
+          else
+            echo "🗺️  Creating URL map..."
+            gcloud compute url-maps create "$URL_MAP_NAME" \
+              --default-backend-bucket="$BACKEND_NAME" \
+              --project="${{ env.PROJECT_ID }}" \
+              --global || echo "⚠️  URL map creation failed"
+          fi
+          
+          # Check if proxy exists
+          if gcloud compute target-http-proxies describe "$PROXY_NAME" --global --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+            echo "✅ HTTP proxy already exists: $PROXY_NAME"
+          else
+            echo "🔗 Creating HTTP proxy..."
+            gcloud compute target-http-proxies create "$PROXY_NAME" \
+              --url-map="$URL_MAP_NAME" \
+              --project="${{ env.PROJECT_ID }}" \
+              --global || echo "⚠️  Proxy creation failed"
+          fi
+          
+          # Check if static IP exists
+          if gcloud compute addresses describe "$IP_NAME" --global --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+            echo "✅ Static IP already exists: $IP_NAME"
+            IP_ADDRESS=$(gcloud compute addresses describe "$IP_NAME" \
+              --global \
+              --format="value(address)" \
+              --project="${{ env.PROJECT_ID }}")
+          else
+            echo "🌐 Reserving static IP..."
+            gcloud compute addresses create "$IP_NAME" \
+              --global \
+              --project="${{ env.PROJECT_ID }}" || echo "⚠️  IP reservation failed"
+            
+            # Get IP address
+            IP_ADDRESS=$(gcloud compute addresses describe "$IP_NAME" \
+              --global \
+              --format="value(address)" \
+              --project="${{ env.PROJECT_ID }}" 2>/dev/null || echo "")
+          fi
+          
+          if [ -n "$IP_ADDRESS" ]; then
+            echo "✅ Static IP: $IP_ADDRESS"
+            
+            # Check if forwarding rule exists
+            if gcloud compute forwarding-rules describe "$FORWARDING_RULE_NAME" --global --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+              echo "✅ Forwarding rule already exists: $FORWARDING_RULE_NAME"
+            else
+              echo "📡 Creating forwarding rule..."
+              gcloud compute forwarding-rules create "$FORWARDING_RULE_NAME" \
+                --global \
+                --target-http-proxy="$PROXY_NAME" \
+                --address="$IP_ADDRESS" \
+                --ports=80 \
+                --project="${{ env.PROJECT_ID }}" || echo "⚠️  Forwarding rule creation failed"
+            fi
+            
+            echo ""
+            echo "=========================================="
+            echo "✅ Cloud CDN setup complete!"
+            echo "=========================================="
+            echo "🌐 CDN URL: http://$IP_ADDRESS/unity/npc/"
+            echo ""
+            echo "📝 Note: You can update nginx.conf to use CDN URL:"
+            echo "   rewrite ^/unity/npc/(.*)$ http://$IP_ADDRESS/unity/npc/\$1 redirect;"
+            echo ""
+            echo "💡 For HTTPS, set up SSL certificate and use HTTPS proxy"
+          else
+            echo "⚠️  Could not get static IP address"
+          fi
 
       - name: Output GCS bucket name
         id: gcs-bucket
