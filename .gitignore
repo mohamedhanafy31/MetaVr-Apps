@@ -50,3 +50,5 @@ venv/
 # Docker
 *.log
 
+npc.rar
+*.rar
