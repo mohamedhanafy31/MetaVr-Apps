@@ -5,9 +5,17 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Install tools for downloading and extracting
-# Debian repos have unrar, p7zip, and other extraction tools readily available
+# Enable non-free repository for unrar (Debian requires non-free for unrar)
 # Using gdown for Google Drive downloads (reliable, handles large files automatically)
-RUN apt-get update && \
+RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list.d/debian.sources; \
+    else \
+        sed -i 's/deb \(.*\) main/deb \1 main contrib non-free/g' /etc/apt/sources.list || \
+        (echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+         echo "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+         echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list); \
+    fi && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
         file \
