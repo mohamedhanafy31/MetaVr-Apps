@@ -103,6 +103,42 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     fi && \
     cd /app && \
     echo "Now in /app, verifying public/unity/npc structure..." && \
+    echo "" && \
+    echo "==========================================" && \
+    echo "🔍 CRITICAL: Verifying required files exist" && \
+    echo "==========================================" && \
+    MISSING_FILES=0 && \
+    if [ ! -f "public/unity/npc/index.html" ]; then \
+      echo "❌ ERROR: index.html is missing!"; \
+      MISSING_FILES=1; \
+    fi && \
+    if [ ! -d "public/unity/npc/Build" ]; then \
+      echo "❌ ERROR: Build directory is missing!"; \
+      MISSING_FILES=1; \
+    fi && \
+    if [ "$$MISSING_FILES" = "1" ]; then \
+      echo ""; \
+      echo "=========================================="; \
+      echo "❌ BUILD FAILED: Required Unity NPC files are missing!"; \
+      echo "=========================================="; \
+      echo "The RAR file appears to be corrupted or incomplete."; \
+      echo "Expected files:"; \
+      echo "  - public/unity/npc/index.html"; \
+      echo "  - public/unity/npc/Build/ (directory with Unity files)"; \
+      echo ""; \
+      echo "Found files:"; \
+      find public/unity/npc -type f | head -20; \
+      echo ""; \
+      echo "Please check the RAR file on Google Drive and ensure it contains:"; \
+      echo "  - index.html"; \
+      echo "  - Build/ directory with Unity WebGL files"; \
+      echo "  - All other required Unity assets"; \
+      echo ""; \
+      echo "The RAR file may need to be re-uploaded."; \
+      exit 1; \
+    else \
+      echo "✅ All required files found!"; \
+    fi && \
     rm -f public/unity/npc.rar && \
     echo "==========================================" && \
     echo "📁 VERIFYING FINAL STRUCTURE IN public/unity/npc/" && \
