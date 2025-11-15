@@ -299,6 +299,11 @@ RUN npm run build && \
 # Production stage
 FROM nginx:alpine
 
+# ⚠️ CRITICAL: Environment variables to prevent Cloud Run from interfering with gzip
+# These ensure Cloud Run doesn't decompress or modify Unity's pre-compressed files
+ENV GZIP=-k
+ENV FORCE_UNCOMPRESSED=1
+
 # Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
