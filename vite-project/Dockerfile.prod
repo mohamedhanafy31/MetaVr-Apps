@@ -286,9 +286,18 @@ RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
     echo ': ${PORT:=8080}' >> /docker-entrypoint.sh && \
     echo ': ${CDN_IP:=}' >> /docker-entrypoint.sh && \
     echo 'export PORT CDN_IP' >> /docker-entrypoint.sh && \
-    echo 'export cdn_ip="$CDN_IP"' >> /docker-entrypoint.sh && \
-    echo 'envsubst '"'"'${PORT} ${CDN_IP} $cdn_ip'"'"' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf' >> /docker-entrypoint.sh && \
-    echo 'echo "Nginx config generated with PORT=$PORT, CDN_IP=$CDN_IP"' >> /docker-entrypoint.sh && \
+    echo '# Set CDN proxy URL and Host based on CDN_IP' >> /docker-entrypoint.sh && \
+    echo 'if [ -n "$CDN_IP" ]; then' >> /docker-entrypoint.sh && \
+    echo '  export CDN_PROXY_URL="http://$CDN_IP/unity/npc/"' >> /docker-entrypoint.sh && \
+    echo '  export CDN_PROXY_HOST="$CDN_IP"' >> /docker-entrypoint.sh && \
+    echo '  echo "Using CDN: $CDN_PROXY_URL"' >> /docker-entrypoint.sh && \
+    echo 'else' >> /docker-entrypoint.sh && \
+    echo '  export CDN_PROXY_URL="https://storage.googleapis.com/metavr-assets/unity/npc/"' >> /docker-entrypoint.sh && \
+    echo '  export CDN_PROXY_HOST="storage.googleapis.com"' >> /docker-entrypoint.sh && \
+    echo '  echo "Using GCS: $CDN_PROXY_URL"' >> /docker-entrypoint.sh && \
+    echo 'fi' >> /docker-entrypoint.sh && \
+    echo 'envsubst '"'"'${PORT} ${CDN_PROXY_URL} ${CDN_PROXY_HOST}'"'"' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf' >> /docker-entrypoint.sh && \
+    echo 'echo "Nginx config generated with PORT=$PORT"' >> /docker-entrypoint.sh && \
     echo 'nginx -t' >> /docker-entrypoint.sh && \
     echo 'exec nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
