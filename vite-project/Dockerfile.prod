@@ -64,46 +64,106 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     fi && \
     cd ../.. && \
     rm -f public/unity/npc.rar && \
-    echo "Verifying final structure in public/unity/npc/..." && \
+    echo "==========================================" && \
+    echo "📁 VERIFYING FINAL STRUCTURE IN public/unity/npc/" && \
+    echo "==========================================" && \
     if [ -d "public/unity/npc" ]; then \
-      ls -la public/unity/npc/ | head -20 || true; \
+      echo "✅ Directory exists: public/unity/npc/" && \
+      echo "" && \
+      echo "📋 Full directory listing:" && \
+      ls -lah public/unity/npc/ && \
+      echo "" && \
+      echo "📊 File count:" && \
+      find public/unity/npc -type f | wc -l && \
+      echo "📁 Directory count:" && \
+      find public/unity/npc -type d | wc -l && \
+      echo "" && \
+      echo "🔍 Checking for key files:" && \
       if [ -f "public/unity/npc/index.html" ]; then \
         echo "✅ index.html found in public/unity/npc/"; \
+        ls -lh public/unity/npc/index.html; \
       else \
         echo "⚠️ index.html NOT found in public/unity/npc/"; \
+        echo "Looking for HTML files:"; \
+        find public/unity/npc -name "*.html" -type f || echo "No HTML files found"; \
       fi; \
+      echo "" && \
       if [ -d "public/unity/npc/Build" ]; then \
         echo "✅ Build directory found in public/unity/npc/"; \
-        ls -la public/unity/npc/Build/ | head -5 || true; \
+        echo "📋 Build directory contents:" && \
+        ls -lah public/unity/npc/Build/; \
+        echo "" && \
+        echo "🔍 Key Unity files in Build:" && \
+        ls -lh public/unity/npc/Build/*.js public/unity/npc/Build/*.wasm public/unity/npc/Build/*.data 2>/dev/null || echo "Some Unity files may be missing"; \
       else \
         echo "⚠️ Build directory NOT found in public/unity/npc/"; \
+        echo "Looking for Build directories:"; \
+        find public/unity/npc -type d -name "Build" || echo "No Build directory found"; \
       fi; \
+      echo "" && \
+      echo "📂 Complete directory tree (first 3 levels):" && \
+      find public/unity/npc -maxdepth 3 -print | head -30; \
     else \
       echo "❌ public/unity/npc/ directory does not exist!"; \
+      echo "Checking what exists in public/unity/:" && \
+      ls -lah public/unity/ 2>/dev/null || echo "public/unity/ does not exist"; \
     fi && \
+    echo "==========================================" && \
     pip3 uninstall -y --break-system-packages gdown && \
     apk del python3 py3-pip p7zip && \
     echo "Unity NPC files extraction completed to public/unity/npc/"
 
 # Build the application
 RUN npm run build && \
-    echo "Verifying Unity files in dist directory..." && \
-    ls -la dist/unity/npc/ 2>/dev/null || echo "⚠️ Unity files not found in dist/unity/npc/" && \
+    echo "==========================================" && \
+    echo "📁 VERIFYING UNITY FILES IN dist DIRECTORY" && \
+    echo "==========================================" && \
     if [ -d "dist/unity/npc" ]; then \
-      echo "✅ Unity NPC files found in dist:"; \
-      ls -la dist/unity/npc/ | head -20; \
+      echo "✅ Directory exists: dist/unity/npc/" && \
+      echo "" && \
+      echo "📋 Full directory listing:" && \
+      ls -lah dist/unity/npc/ && \
+      echo "" && \
+      echo "📊 File count:" && \
+      find dist/unity/npc -type f | wc -l && \
+      echo "📁 Directory count:" && \
+      find dist/unity/npc -type d | wc -l && \
+      echo "" && \
+      echo "🔍 Checking for key files:" && \
       if [ -f "dist/unity/npc/index.html" ]; then \
-        echo "✅ index.html found"; \
+        echo "✅ index.html found in dist/unity/npc/"; \
+        ls -lh dist/unity/npc/index.html; \
+      else \
+        echo "⚠️ index.html NOT found in dist/unity/npc/"; \
+        echo "Looking for HTML files:"; \
+        find dist/unity/npc -name "*.html" -type f || echo "No HTML files found"; \
       fi; \
+      echo "" && \
       if [ -d "dist/unity/npc/Build" ]; then \
-        echo "✅ Build directory found"; \
-        ls -la dist/unity/npc/Build/ | head -10; \
+        echo "✅ Build directory found in dist/unity/npc/"; \
+        echo "📋 Build directory contents:" && \
+        ls -lah dist/unity/npc/Build/; \
+        echo "" && \
+        echo "🔍 Key Unity files in Build:" && \
+        ls -lh dist/unity/npc/Build/*.js dist/unity/npc/Build/*.wasm dist/unity/npc/Build/*.data 2>/dev/null || echo "Some Unity files may be missing"; \
+      else \
+        echo "⚠️ Build directory NOT found in dist/unity/npc/"; \
+        echo "Looking for Build directories:"; \
+        find dist/unity/npc -type d -name "Build" || echo "No Build directory found"; \
       fi; \
+      echo "" && \
+      echo "📂 Complete directory tree (first 3 levels):" && \
+      find dist/unity/npc -maxdepth 3 -print | head -30; \
     else \
-      echo "❌ dist/unity/npc/ directory not found!"; \
-      echo "Checking dist structure:"; \
-      find dist -name "unity" -o -name "npc" 2>/dev/null | head -10; \
-    fi
+      echo "❌ dist/unity/npc/ directory not found!" && \
+      echo "Checking dist structure:" && \
+      echo "Top-level dist contents:" && \
+      ls -lah dist/ | head -20 && \
+      echo "" && \
+      echo "Searching for unity or npc:" && \
+      find dist -name "unity" -o -name "npc" 2>/dev/null | head -20; \
+    fi && \
+    echo "==========================================" && \
 
 # Production stage
 FROM nginx:alpine
