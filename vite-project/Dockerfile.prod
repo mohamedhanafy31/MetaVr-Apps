@@ -4,7 +4,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install tools for downloading and extracting
-# Using wget for Google Drive downloads (more reliable than gdown, no Python needed)
+# Using wget for Google Drive downloads (primary method)
+# gdown kept as fallback if wget fails (installed only if needed)
 # Try to install unrar from edge repository, or download unrar binary manually
 # Python rarfile is kept as fallback for extraction if unrar fails
 RUN apk add --no-cache wget curl file p7zip && \
@@ -33,21 +34,45 @@ RUN mkdir -p public/unity/npc && \
     echo "Downloading Unity NPC files from Google Drive..." && \
     FILE_ID="1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks" && \
     echo "File ID: $FILE_ID" && \
-    echo "Step 1: Attempting download (handles both small and large files)..." && \
+    echo "Step 1: Getting initial download page..." && \
     wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate \
-        "https://drive.google.com/uc?export=download&id=$FILE_ID" -O /tmp/temp_download && \
-    if file /tmp/temp_download | grep -q "HTML\|text"; then \
+        "https://drive.google.com/uc?export=download&id=$FILE_ID" -O /tmp/temp_download.html && \
+    if file /tmp/temp_download.html | grep -q "HTML\|text"; then \
         echo "Large file detected (got warning page), extracting confirmation token..." && \
-        CONFIRM_TOKEN=$(sed -n 's/.*confirm=\([^&]*\).*/\1/p' /tmp/temp_download | head -1) && \
-        rm -f /tmp/temp_download && \
+        CONFIRM_TOKEN=$(grep -o 'confirm=[^"&]*' /tmp/temp_download.html | sed 's/confirm=//' | head -1) && \
+        if [ -z "$CONFIRM_TOKEN" ]; then \
+            CONFIRM_TOKEN=$(sed -n 's/.*confirm=\([a-zA-Z0-9_-]*\).*/\1/p' /tmp/temp_download.html | head -1); \
+        fi && \
+        if [ -z "$CONFIRM_TOKEN" ]; then \
+            CONFIRM_TOKEN=$(grep -o 'href="[^"]*confirm=[^"&]*' /tmp/temp_download.html | sed -n 's/.*confirm=\([^"&]*\).*/\1/p' | head -1); \
+        fi && \
+        echo "Extracted token: $CONFIRM_TOKEN" && \
+        if [ -z "$CONFIRM_TOKEN" ]; then \
+            echo "ERROR: Could not extract confirmation token from HTML page" && \
+            echo "HTML content (first 500 chars):" && \
+            head -c 500 /tmp/temp_download.html && \
+            exit 1; \
+        fi && \
+        rm -f /tmp/temp_download.html && \
         echo "Step 2: Downloading with confirmation token..." && \
-        wget --quiet --show-progress --load-cookies /tmp/cookies.txt --no-check-certificate \
-            "https://drive.google.com/uc?export=download&confirm=$CONFIRM_TOKEN&id=$FILE_ID" -O npc.rar; \
+        wget --quiet --show-progress --load-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate \
+            "https://drive.google.com/uc?export=download&confirm=$CONFIRM_TOKEN&id=$FILE_ID" -O npc.rar && \
+        FILE_SIZE=$(wc -c < npc.rar 2>/dev/null || echo 0) && \
+        if [ "$FILE_SIZE" -lt 10000 ] || file npc.rar | grep -q "HTML\|text"; then \
+            echo "WARNING: Still got HTML page instead of RAR file. Trying gdown as fallback..." && \
+            rm -f npc.rar && \
+            if ! command -v gdown >/dev/null 2>&1; then \
+                echo "Installing gdown as fallback..." && \
+                apk add --no-cache python3 py3-pip && \
+                pip3 install --no-cache-dir --break-system-packages gdown; \
+            fi && \
+            gdown "$FILE_ID" -O npc.rar || (echo "ERROR: Both wget and gdown failed to download the file" && exit 1); \
+        fi; \
     else \
         echo "Small file detected, using direct download..." && \
-        mv /tmp/temp_download npc.rar; \
+        mv /tmp/temp_download.html npc.rar; \
     fi && \
-    rm -f /tmp/cookies.txt /tmp/temp_download && \
+    rm -f /tmp/cookies.txt /tmp/temp_download.html && \
     echo "Verifying downloaded file..." && \
     ls -lh npc.rar && \
     FILE_TYPE=$(file npc.rar 2>/dev/null || echo "unknown") && \
@@ -236,7 +261,7 @@ RUN mkdir -p public/unity/npc && \
     fi && \
     echo "==========================================" && \
     rm -f /tmp/cookies.txt /tmp/confirm_token 2>/dev/null || true && \
-    (pip3 uninstall -y --break-system-packages rarfile 2>/dev/null || true) && \
+    (pip3 uninstall -y --break-system-packages gdown rarfile 2>/dev/null || true) && \
     (apk del python3 py3-pip 2>/dev/null || true) && \
     echo "Unity NPC files extraction completed to public/unity/npc/"
 
