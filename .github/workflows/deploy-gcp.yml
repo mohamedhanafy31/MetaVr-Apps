@@ -21,7 +21,8 @@ env:
   SERVICE_NAME: metavr-frontend
   REGION: us-central1
   # GCS bucket name - uses a fixed name for consistency, or set via secret
-  GCS_BUCKET_NAME: ${{ secrets.UNITY_GCS_BUCKET_NAME || 'metavr-unity-build-production' }}
+  # This bucket is used for Unity WebGL files (redirected from Cloud Run)
+  GCS_BUCKET_NAME: ${{ secrets.UNITY_GCS_BUCKET_NAME || 'metavr-assets' }}
   # Google Drive file ID for Unity NPC files
   UNITY_DRIVE_FILE_ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
 
@@ -120,7 +121,7 @@ jobs:
             echo "✅ Bucket already exists"
           fi
           
-          # Configure CORS
+          # Configure CORS for browser access
           echo "🌐 Configuring CORS..."
           cat > /tmp/cors.json << 'EOF'
           [
@@ -141,9 +142,11 @@ jobs:
           EOF
           gsutil cors set /tmp/cors.json "gs://$BUCKET_NAME"
           
-          # Make bucket publicly readable
+          # Make bucket publicly readable (required for Unity WebGL browser access)
           echo "🔓 Making bucket publicly readable..."
           gsutil iam ch allUsers:objectViewer "gs://$BUCKET_NAME" || echo "Permissions may already be set"
+          
+          echo "✅ Bucket configured for public access and CORS"
           
           echo "✅ Bucket setup complete: gs://$BUCKET_NAME"
 
@@ -162,68 +165,72 @@ jobs:
           echo "📤 Uploading Unity files to GCS..."
           echo "Source: $BUILD_DIR"
           echo "Destination: gs://$BUCKET_NAME/unity/npc/Build/"
+          echo ""
+          echo "Note: Files are uploaded with .gz extension (for nginx redirect)"
+          echo ""
           
-          # Upload yes.wasm.gz as yes.wasm (with gzip encoding)
-          if [ -f "$BUILD_DIR/yes.wasm.gz" ]; then
-            echo "Uploading yes.wasm.gz → yes.wasm..."
+          # Upload .wasm.gz files (keep .gz extension for redirect)
+          echo "1. Uploading .wasm.gz files..."
+          find "$BUILD_DIR" -name "*.wasm.gz" -type f | while read -r file; do
+            filename=$(basename "$file")
+            echo "   Uploading $filename..."
             gsutil -h "Content-Type:application/wasm" \
                    -h "Content-Encoding:gzip" \
-                   cp "$BUILD_DIR/yes.wasm.gz" "gs://$BUCKET_NAME/unity/npc/Build/yes.wasm"
-          fi
+                   cp "$file" "gs://$BUCKET_NAME/unity/npc/Build/$filename"
+          done
           
-          # Upload yes.data.gz as yes.data (with gzip encoding)
-          if [ -f "$BUILD_DIR/yes.data.gz" ]; then
-            echo "Uploading yes.data.gz → yes.data..."
+          # Upload .data.gz files (keep .gz extension for redirect)
+          echo "2. Uploading .data.gz files..."
+          find "$BUILD_DIR" -name "*.data.gz" -type f | while read -r file; do
+            filename=$(basename "$file")
+            echo "   Uploading $filename..."
             gsutil -h "Content-Type:application/octet-stream" \
                    -h "Content-Encoding:gzip" \
-                   cp "$BUILD_DIR/yes.data.gz" "gs://$BUCKET_NAME/unity/npc/Build/yes.data"
-          fi
+                   cp "$file" "gs://$BUCKET_NAME/unity/npc/Build/$filename"
+          done
           
-          # Upload yes.framework.js.gz as yes.framework.js (with gzip encoding)
-          if [ -f "$BUILD_DIR/yes.framework.js.gz" ]; then
-            echo "Uploading yes.framework.js.gz → yes.framework.js..."
+          # Upload .js.gz files (keep .gz extension for redirect)
+          echo "3. Uploading .js.gz files..."
+          find "$BUILD_DIR" -name "*.js.gz" -type f | while read -r file; do
+            filename=$(basename "$file")
+            echo "   Uploading $filename..."
             gsutil -h "Content-Type:application/javascript" \
                    -h "Content-Encoding:gzip" \
-                   cp "$BUILD_DIR/yes.framework.js.gz" "gs://$BUCKET_NAME/unity/npc/Build/yes.framework.js"
-          fi
+                   cp "$file" "gs://$BUCKET_NAME/unity/npc/Build/$filename"
+          done
           
-          # Upload yes.loader.js (not gzipped)
-          if [ -f "$BUILD_DIR/yes.loader.js" ]; then
-            echo "Uploading yes.loader.js..."
+          # Upload .js files (non-gzipped like loader.js)
+          echo "4. Uploading .js files (non-gzipped)..."
+          find "$BUILD_DIR" -name "*.js" -type f ! -name "*.gz" | while read -r file; do
+            filename=$(basename "$file")
+            echo "   Uploading $filename..."
             gsutil -h "Content-Type:application/javascript" \
-                   cp "$BUILD_DIR/yes.loader.js" "gs://$BUCKET_NAME/unity/npc/Build/yes.loader.js"
-          fi
+                   cp "$file" "gs://$BUCKET_NAME/unity/npc/Build/$filename"
+          done
           
           # Upload TemplateData directory if it exists
           if [ -d "$BUILD_DIR/TemplateData" ]; then
-            echo "Uploading TemplateData directory..."
+            echo "5. Uploading TemplateData directory..."
             gsutil -m cp -r "$BUILD_DIR/TemplateData" "gs://$BUCKET_NAME/unity/npc/Build/"
           fi
           
-          # Upload other files
-          echo "Uploading other files..."
-          # Use find to avoid glob expansion issues
-          find "$BUILD_DIR" -maxdepth 1 -type f \( -name "*.js" -o -name "*.json" -o -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \) 2>/dev/null | while read -r file; do
-            if [ -f "$file" ] && [[ "$file" != *"loader.js" ]] && [[ "$file" != *".gz" ]]; then
-              filename=$(basename "$file")
-              ext="${filename##*.}"
-              case "$ext" in
-                js) content_type="application/javascript" ;;
-                json) content_type="application/json" ;;
-                png) content_type="image/png" ;;
-                jpg|jpeg) content_type="image/jpeg" ;;
-                *) content_type="application/octet-stream" ;;
-              esac
-              echo "  Uploading $filename ($content_type)..."
-              gsutil -h "Content-Type:$content_type" \
-                     cp "$file" "gs://$BUCKET_NAME/unity/npc/Build/$filename"
-            fi
-          done || echo "No additional files to upload"
+          # Upload index.html if it exists in parent directory
+          if [ -f "$(dirname "$BUILD_DIR")/index.html" ]; then
+            echo "6. Uploading index.html..."
+            gsutil -h "Content-Type:text/html" \
+                   cp "$(dirname "$BUILD_DIR")/index.html" "gs://$BUCKET_NAME/unity/npc/index.html"
+          fi
           
           echo ""
           echo "✅ Upload complete!"
           echo "📋 Verifying uploaded files..."
-          gsutil ls -lh "gs://$BUCKET_NAME/unity/npc/Build/" | grep -E "yes\.(wasm|data|framework\.js|loader\.js)$"
+          gsutil ls -lh "gs://$BUCKET_NAME/unity/npc/Build/" | head -20
+          
+          echo ""
+          echo "🔗 Public URLs (for testing):"
+          echo "   https://storage.googleapis.com/$BUCKET_NAME/unity/npc/Build/yes.loader.js"
+          echo "   https://storage.googleapis.com/$BUCKET_NAME/unity/npc/Build/yes.data.gz"
+          echo "   https://storage.googleapis.com/$BUCKET_NAME/unity/npc/Build/yes.wasm.gz"
 
       - name: Output GCS bucket name
         id: gcs-bucket
