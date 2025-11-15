@@ -524,13 +524,14 @@ jobs:
           echo "🚀 Deploying with GCS bucket: $GCS_BUCKET"
           if [ -n "$CDN_IP" ]; then
             echo "🌐 Using CDN IP: $CDN_IP"
-            gcloud builds submit --config cloudbuild.yaml \
-              --substitutions=_COMMIT_SHA=${{ github.sha }},_SHORT_SHA=${SHORT_SHA},_UNITY_GCS_BUCKET=${GCS_BUCKET},_CDN_IP=${CDN_IP}
           else
             echo "📦 Using GCS directly (CDN not available)"
-            gcloud builds submit --config cloudbuild.yaml \
-              --substitutions=_COMMIT_SHA=${{ github.sha }},_SHORT_SHA=${SHORT_SHA},_UNITY_GCS_BUCKET=${GCS_BUCKET}
+            CDN_IP=""  # Ensure empty string if not set
           fi
+          
+          # Always pass _CDN_IP (even if empty) to match cloudbuild.yaml substitutions
+          gcloud builds submit --config cloudbuild.yaml \
+            --substitutions=_COMMIT_SHA=${{ github.sha }},_SHORT_SHA=${SHORT_SHA},_UNITY_GCS_BUCKET=${GCS_BUCKET},_CDN_IP=${CDN_IP}
 
       - name: Get Service URL
         id: service-url
