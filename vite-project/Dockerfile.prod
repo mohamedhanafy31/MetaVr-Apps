@@ -20,8 +20,9 @@ COPY . .
 # Download and extract Unity NPC files from Google Drive
 # File ID: 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks
 # Using gdown for reliable large file downloads from Google Drive
+# Extract to public/unity/npc/ directory
 RUN pip3 install --no-cache-dir --break-system-packages gdown && \
-    mkdir -p public/unity && \
+    mkdir -p public/unity/npc && \
     cd public/unity && \
     echo "Downloading Unity NPC files from Google Drive..." && \
     gdown 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks -O npc.rar && \
@@ -29,24 +30,39 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
     ls -lh npc.rar && \
     FILE_TYPE=$(file npc.rar 2>/dev/null || echo "unknown") && \
     echo "File type: $FILE_TYPE" && \
-    echo "Extracting npc.rar (may show warnings but will continue)..." && \
-    7z x npc.rar -o. -y 2>&1 | tee /tmp/extract.log || true && \
-    echo "Checking if files were extracted..." && \
-    EXTRACTED_COUNT=$(ls -A . 2>/dev/null | grep -v npc.rar | wc -l) && \
+    echo "Extracting npc.rar to npc/ directory..." && \
+    7z x npc.rar -onpc -y 2>&1 | tee /tmp/extract.log || true && \
+    echo "Checking extraction result..." && \
+    cd npc && \
+    EXTRACTED_COUNT=$(ls -A . 2>/dev/null | wc -l) && \
+    echo "Files in npc/ directory: $EXTRACTED_COUNT" && \
     if [ -d "Build" ] || [ -f "index.html" ] || [ "$EXTRACTED_COUNT" -gt 0 ]; then \
-      echo "✅ Files extracted successfully (extracted $EXTRACTED_COUNT items, warnings may be normal)"; \
+      echo "✅ Files extracted successfully to npc/ directory"; \
+      echo "Directory structure:"; \
       ls -la . | head -20 || true; \
+      if [ -d "Build" ]; then \
+        echo "✅ Build directory found"; \
+        ls -la Build/ | head -10 || true; \
+      fi; \
     else \
-      echo "⚠️ No files found after extraction, trying alternative method..." && \
-      (gunzip -c npc.rar 2>/dev/null | tar -xvf - 2>/dev/null || \
-       tar -xzf npc.rar 2>/dev/null || \
-       echo "⚠️ Alternative extraction also failed, but continuing build...") && \
+      echo "⚠️ Checking if extraction created nested npc folder..." && \
+      cd .. && \
+      if [ -d "npc/npc" ]; then \
+        echo "Moving files from npc/npc to npc/..." && \
+        mv npc/npc/* npc/ 2>/dev/null || true; \
+        rm -rf npc/npc; \
+        echo "✅ Files moved to correct location"; \
+      fi; \
+      cd npc && \
       ls -la . | head -20 || true; \
     fi && \
-    rm -f npc.rar && \
+    cd ../.. && \
+    rm -f public/unity/npc.rar && \
+    echo "Verifying final structure..." && \
+    ls -la public/unity/npc/ | head -20 || true && \
     pip3 uninstall -y --break-system-packages gdown && \
     apk del python3 py3-pip p7zip && \
-    echo "Unity NPC files extraction completed"
+    echo "Unity NPC files extraction completed to public/unity/npc/"
 
 # Build the application
 RUN npm run build
