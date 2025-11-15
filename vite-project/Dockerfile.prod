@@ -27,7 +27,8 @@ RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/* && \
     # Install gdown for Google Drive downloads
-    pip3 install --no-cache-dir gdown rarfile
+    # Using --break-system-packages is safe in Docker containers (isolated environment)
+    pip3 install --no-cache-dir --break-system-packages gdown rarfile
 
 # Copy package files
 COPY package*.json ./
