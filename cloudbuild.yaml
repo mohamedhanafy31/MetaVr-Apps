@@ -169,8 +169,8 @@ steps:
         echo "🌍 Service: metavr-frontend"
         echo "📍 Region: us-central1"
         echo "📦 Image: $$IMAGE_TAG"
-        echo "💾 Memory: 512Mi"
-        echo "⚡ CPU: 1"
+        echo "💾 Memory: 1Gi (increased for better proxy performance)"
+        echo "⚡ CPU: 2 (increased for better proxy performance)"
         echo "⏳ Deploying..."
         echo ""
         
@@ -204,8 +204,8 @@ steps:
           --platform managed \
           --allow-unauthenticated \
           --port 8080 \
-          --memory 512Mi \
-          --cpu 1 \
+          --memory 1Gi \
+          --cpu 2 \
           --min-instances 0 \
           --max-instances 10 \
           --timeout 300 \

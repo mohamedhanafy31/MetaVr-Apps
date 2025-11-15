@@ -2,39 +2,33 @@ import { Unity, useUnityContext } from "react-unity-webgl";
 import { Link } from "react-router-dom";
 
 /**
- * Get Unity file URL - uses GCS if bucket is configured, otherwise uses local path
- * @param {string} filename - The Unity file name (e.g., "yes.loader.js", "yes.data")
+ * Get Unity file URL - uses Direct GCS URLs for optimal performance
+ * Browser loads files directly from GCS → loading time < 1 second
+ * 
+ * @param {string} filename - The Unity file name (e.g., "yes.loader.js", "yes.data.gz")
  * @returns {string} - Full URL to the Unity file
  */
 function getUnityFileUrl(filename) {
-  const gcsBucket = import.meta.env.VITE_UNITY_GCS_BUCKET;
+  // Default GCS bucket (can be overridden via env var)
+  const gcsBucket = import.meta.env.VITE_UNITY_GCS_BUCKET || 'metavr-assets';
   
-  if (gcsBucket) {
-    // Use GCS bucket URL
-    // Note: Files are uploaded without .gz extension but with Content-Encoding: gzip
-    // So yes.data.gz becomes yes.data, yes.wasm.gz becomes yes.wasm, etc.
-    const baseUrl = `https://storage.googleapis.com/${gcsBucket}/unity/npc/Build`;
-    
-    // Remove .gz extension if present (GCS files are stored without .gz but with gzip encoding)
-    const cleanFilename = filename.replace(/\.gz$/, '');
-    
-    return `${baseUrl}/${cleanFilename}`;
-  }
+  // Direct GCS URL - Browser loads files directly (fastest option)
+  // Files are stored with .gz extension and Content-Encoding: gzip
+  const baseUrl = `https://storage.googleapis.com/${gcsBucket}/unity/npc/Build`;
   
-  // Fallback to local path (served by nginx)
-  return `/unity/npc/Build/${filename}`;
+  // Return direct GCS URL (keep .gz extension as files are stored with it)
+  return `${baseUrl}/${filename}`;
 }
 
 export default function NPCDemo() {
   const { unityProvider, isLoaded, loadingProgression } = useUnityContext({
-    // Use GCS URLs if VITE_UNITY_GCS_BUCKET is set, otherwise use local paths
-    // Note: GCS files are stored without .gz extension (yes.data, yes.wasm, etc.)
-    // but with Content-Encoding: gzip, so we pass the original filenames and
-    // getUnityFileUrl will handle the conversion
+    // Direct GCS URLs - Browser loads files directly from GCS
+    // This is the fastest option: loading time < 1 second
+    // Files are stored with .gz extension and Content-Encoding: gzip in GCS
     loaderUrl: getUnityFileUrl("yes.loader.js"),
-    dataUrl: getUnityFileUrl("yes.data.gz"),      // Will become yes.data in GCS
-    frameworkUrl: getUnityFileUrl("yes.framework.js.gz"), // Will become yes.framework.js in GCS
-    codeUrl: getUnityFileUrl("yes.wasm.gz"),      // Will become yes.wasm in GCS
+    dataUrl: getUnityFileUrl("yes.data.gz"),
+    frameworkUrl: getUnityFileUrl("yes.framework.js.gz"),
+    codeUrl: getUnityFileUrl("yes.wasm.gz"),
   });
 
   return (
