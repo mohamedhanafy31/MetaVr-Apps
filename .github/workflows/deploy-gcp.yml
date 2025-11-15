@@ -419,13 +419,23 @@ jobs:
             echo "✅ Cloud CDN setup complete!"
             echo "=========================================="
             echo "🌐 CDN URL: http://$IP_ADDRESS/unity/npc/"
+            echo "🌐 CDN HTTPS URL: https://$IP_ADDRESS/unity/npc/ (if HTTPS proxy configured)"
             echo ""
-            echo "📝 Note: You can update nginx.conf to use CDN URL:"
-            echo "   rewrite ^/unity/npc/(.*)$ http://$IP_ADDRESS/unity/npc/\$1 redirect;"
+            echo "📝 CDN IP Address saved for future reference: $IP_ADDRESS"
+            echo ""
+            echo "💡 Note: nginx.conf uses proxy_pass to GCS directly (faster than redirect)"
+            echo "   To use CDN URL instead, update nginx.conf:"
+            echo "   proxy_pass http://$IP_ADDRESS/unity/npc/;"
             echo ""
             echo "💡 For HTTPS, set up SSL certificate and use HTTPS proxy"
           else
             echo "⚠️  Could not get static IP address"
+            echo "   Using direct GCS proxy (still fast, but CDN would be faster)"
+          fi
+          
+          # Output CDN IP for potential use in nginx config
+          if [ -n "$IP_ADDRESS" ]; then
+            echo "CDN_IP=$IP_ADDRESS" >> $GITHUB_ENV
           fi
 
       - name: Output GCS bucket name
