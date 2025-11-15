@@ -194,7 +194,25 @@ RUN mkdir -p public/unity/npc && \
         echo "⚠️ WARNING: Unity loader file not found (expected yes.loader.js or npc.loader.js)"; \
     fi && \
     echo "✅ All required files found!" && \
+    echo "" && \
+    echo "🧹 Cleaning up unnecessary files..." && \
+    if [ -d "public/unity/npc/node_modules" ]; then \
+        echo "Removing node_modules directory (not needed for Unity WebGL)..." && \
+        rm -rf public/unity/npc/node_modules && \
+        echo "✅ node_modules removed"; \
+    fi && \
+    if [ -f "public/unity/npc/package.json" ] || [ -f "public/unity/npc/package-lock.json" ]; then \
+        echo "Removing package.json files (not needed for Unity WebGL)..." && \
+        rm -f public/unity/npc/package.json public/unity/npc/package-lock.json && \
+        echo "✅ package files removed"; \
+    fi && \
+    if [ -f "public/unity/npc/server.js" ]; then \
+        echo "Removing server.js (not needed for static hosting)..." && \
+        rm -f public/unity/npc/server.js && \
+        echo "✅ server.js removed"; \
+    fi && \
     rm -f public/unity/npc.rar && \
+    echo "" && \
     echo "==========================================" && \
     echo "📁 VERIFYING FINAL STRUCTURE IN public/unity/npc/" && \
     echo "==========================================" && \
