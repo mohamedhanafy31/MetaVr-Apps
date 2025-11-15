@@ -139,15 +139,42 @@ RUN mkdir -p public/unity/npc && \
         echo "✅ Files found at root of extraction"; \
         echo "Root files:"; \
         ls -lah .; \
-        echo "Moving files to target location..."; \
-        cp -r * /app/public/unity/npc/ 2>&1 || echo "Copy failed"; \
-        cp -r .??* /app/public/unity/npc/ 2>&1 || true; \
+        echo "Copying only required Unity WebGL files..."; \
+        if [ -d "Build" ]; then \
+            cp -r Build /app/public/unity/npc/ && \
+            echo "✅ Build directory copied"; \
+        else \
+            echo "❌ ERROR: Build directory not found"; \
+            exit 1; \
+        fi && \
+        if [ -d "TemplateData" ]; then \
+            cp -r TemplateData /app/public/unity/npc/ && \
+            echo "✅ TemplateData directory copied"; \
+        fi && \
+        if [ -f "index.html" ]; then \
+            cp index.html /app/public/unity/npc/ && \
+            echo "✅ index.html copied"; \
+        else \
+            echo "❌ ERROR: index.html not found"; \
+            exit 1; \
+        fi && \
+        cp logo*.png /app/public/unity/npc/ 2>/dev/null || true && \
+        echo "✅ Required files copied (excluding unnecessary files)"; \
     else \
         echo "⚠️ No expected structure found, listing all extracted items:"; \
         find . -type f | head -30; \
         find . -type d | head -20; \
-        echo "Attempting to copy everything to target..."; \
-        cp -r * /app/public/unity/npc/ 2>&1 || echo "Copy failed"; \
+        echo "Attempting to find and copy required files..." && \
+        if [ -d "Build" ] || find . -type d -name "Build" | head -1 | xargs -I {} cp -r {} /app/public/unity/npc/ 2>/dev/null; then \
+            echo "✅ Build directory found and copied"; \
+        fi && \
+        if [ -d "TemplateData" ] || find . -type d -name "TemplateData" | head -1 | xargs -I {} cp -r {} /app/public/unity/npc/ 2>/dev/null; then \
+            echo "✅ TemplateData directory found and copied"; \
+        fi && \
+        if [ -f "index.html" ] || find . -type f -name "index.html" | head -1 | xargs -I {} cp {} /app/public/unity/npc/ 2>/dev/null; then \
+            echo "✅ index.html found and copied"; \
+        fi && \
+        find . -name "logo*.png" -type f -exec cp {} /app/public/unity/npc/ \; 2>/dev/null || true; \
     fi && \
     cd /app/public/unity && \
     echo "" && \
@@ -211,23 +238,9 @@ RUN mkdir -p public/unity/npc && \
     fi && \
     echo "✅ All required files found!" && \
     echo "" && \
-    echo "🧹 Cleaning up unnecessary files..." && \
-    if [ -d "public/unity/npc/node_modules" ]; then \
-        echo "Removing node_modules directory (not needed for Unity WebGL)..." && \
-        rm -rf public/unity/npc/node_modules && \
-        echo "✅ node_modules removed"; \
-    fi && \
-    if [ -f "public/unity/npc/package.json" ] || [ -f "public/unity/npc/package-lock.json" ]; then \
-        echo "Removing package.json files (not needed for Unity WebGL)..." && \
-        rm -f public/unity/npc/package.json public/unity/npc/package-lock.json && \
-        echo "✅ package files removed"; \
-    fi && \
-    if [ -f "public/unity/npc/server.js" ]; then \
-        echo "Removing server.js (not needed for static hosting)..." && \
-        rm -f public/unity/npc/server.js && \
-        echo "✅ server.js removed"; \
-    fi && \
+    echo "🧹 Cleaning up temporary files..." && \
     rm -f public/unity/npc.rar && \
+    rm -rf /tmp/extract_temp /tmp/extract.log 2>/dev/null || true && \
     echo "" && \
     echo "==========================================" && \
     echo "📁 VERIFYING FINAL STRUCTURE IN public/unity/npc/" && \
