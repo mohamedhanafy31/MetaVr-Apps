@@ -6,7 +6,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install required tools
-RUN apk add --no-cache python3 py3-pip unrar wget
+# unrar is in Alpine edge repository
+RUN apk add --no-cache python3 py3-pip wget && \
+    apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community unrar || \
+    (echo "unrar not available, will try alternative extraction method" && apk add --no-cache p7zip)
 
 # Install gdown
 RUN pip3 install --no-cache-dir gdown
@@ -25,7 +28,14 @@ RUN mkdir -p public/unity/npc && \
     echo "Downloading RAR file..." && \
     gdown --id 1zQ5DCoamu-hAzzB3-p45-QNKxx_EdDks -O /app/public/unity/npc/npc.rar && \
     echo "Extracting..." && \
-    unrar x /app/public/unity/npc/npc.rar /app/public/unity/npc/ && \
+    if command -v unrar >/dev/null 2>&1; then \
+      unrar x /app/public/unity/npc/npc.rar /app/public/unity/npc/; \
+    elif command -v 7z >/dev/null 2>&1; then \
+      cd /app/public/unity/npc && 7z x npc.rar -y && \
+      if [ -d "npc" ]; then mv npc/* . && rmdir npc; fi; \
+    else \
+      echo "ERROR: No extraction tool available!" && exit 1; \
+    fi && \
     rm /app/public/unity/npc/npc.rar && \
     echo "Extraction Complete" && \
     ls -lah /app/public/unity/npc
