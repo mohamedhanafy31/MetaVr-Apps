@@ -52,43 +52,21 @@ RUN pip3 install --no-cache-dir --break-system-packages gdown && \
       unrar x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || (echo "unrar failed, trying Python rarfile..." && python3 -c "import rarfile; rf = rarfile.RarFile('/app/public/unity/npc.rar'); rf.extractall('.'); print('Extraction complete')" 2>&1 | tee -a /tmp/extract.log || true); \
     elif python3 -c "import rarfile" 2>/dev/null; then \
       echo "Using Python rarfile for extraction..." && \
-      python3 << 'PYEOF' 2>&1 | tee /tmp/extract.log || true
-import rarfile
-import sys
-import os
-
-# Set unrar tool path if available
-if os.path.exists('/usr/bin/unrar'):
-    rarfile.UNRAR_TOOL = '/usr/bin/unrar'
-elif os.path.exists('/usr/local/bin/unrar'):
-    rarfile.UNRAR_TOOL = '/usr/local/bin/unrar'
-else:
-    # Try to find unrar in PATH
-    import shutil
-    unrar_path = shutil.which('unrar')
-    if unrar_path:
-        rarfile.UNRAR_TOOL = unrar_path
-    else:
-        print("WARNING: unrar binary not found. Python rarfile may not work for RAR v5 files.", file=sys.stderr)
-
-try:
-    rf = rarfile.RarFile('/app/public/unity/npc.rar')
-    print(f"RAR file opened successfully. Number of files: {len(rf.namelist())}")
-    print(f"RAR file list (first 20): {rf.namelist()[:20]}")
-    print("Extracting all files...")
-    rf.extractall('.')
-    print("Extraction complete!")
-    print(f"Extracted files: {len([f for f in os.listdir('.') if os.path.isfile(f)])}")
-    print(f"Extracted directories: {len([d for d in os.listdir('.') if os.path.isdir(d)])}")
-    print("All extracted items:")
-    for item in sorted(os.listdir('.')):
-        print(f"  {item}")
-except Exception as e:
-    print(f"ERROR during extraction: {e}", file=sys.stderr)
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
-PYEOF
+      python3 -c "import rarfile, sys, os, shutil; \
+unrar_path = None; \
+if os.path.exists('/usr/bin/unrar'): unrar_path = '/usr/bin/unrar'; \
+elif os.path.exists('/usr/local/bin/unrar'): unrar_path = '/usr/local/bin/unrar'; \
+else: unrar_path = shutil.which('unrar'); \
+if unrar_path: rarfile.UNRAR_TOOL = unrar_path; \
+else: print('WARNING: unrar binary not found', file=sys.stderr); \
+rf = rarfile.RarFile('/app/public/unity/npc.rar'); \
+print(f'RAR file opened. Files: {len(rf.namelist())}'); \
+print(f'First 20 files: {rf.namelist()[:20]}'); \
+rf.extractall('.'); \
+print('Extraction complete!'); \
+items = sorted(os.listdir('.')); \
+print(f'Extracted: {len([f for f in items if os.path.isfile(f)])} files, {len([d for d in items if os.path.isdir(d)])} dirs'); \
+[print(f'  {item}') for item in items]" 2>&1 | tee /tmp/extract.log || true
     else \
       echo "Using 7z as fallback (may not fully support RAR v5)..." && \
       7z x /app/public/unity/npc.rar -y 2>&1 | tee /tmp/extract.log || true; \
