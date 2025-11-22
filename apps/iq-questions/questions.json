@@ -1,0 +1,242 @@
+[
+  {
+    "id": 1,
+    "question": "What number comes next in the sequence: 2, 6, 12, 20, 30, ?",
+    "choices": [
+      "40",
+      "42",
+      "44",
+      "46"
+    ],
+    "correctAnswer": "42",
+    "score": 20
+  },
+  {
+    "id": 2,
+    "question": "If all roses are flowers, and some flowers are red, which statement must be true?",
+    "choices": [
+      "All roses are red",
+      "Some roses are red",
+      "No roses are red",
+      "Cannot be determined"
+    ],
+    "correctAnswer": "Cannot be determined",
+    "score": 25
+  },
+  {
+    "id": 3,
+    "question": "What is the missing number: 3, 8, 15, 24, 35, ?",
+    "choices": [
+      "46",
+      "48",
+      "50",
+      "52"
+    ],
+    "correctAnswer": "48",
+    "score": 20
+  },
+  {
+    "id": 4,
+    "question": "If CAT is coded as 3120, how is DOG coded?",
+    "choices": [
+      "4157",
+      "4156",
+      "4158",
+      "4159"
+    ],
+    "correctAnswer": "4157",
+    "score": 25
+  },
+  {
+    "id": 5,
+    "question": "Complete the analogy: Book is to Library as Car is to ?",
+    "choices": [
+      "Road",
+      "Garage",
+      "Driver",
+      "Engine"
+    ],
+    "correctAnswer": "Garage",
+    "score": 15
+  },
+  {
+    "id": 6,
+    "question": "What comes next: A, D, G, J, ?",
+    "choices": [
+      "K",
+      "L",
+      "M",
+      "N"
+    ],
+    "correctAnswer": "M",
+    "score": 15
+  },
+  {
+    "id": 7,
+    "question": "If 5 workers can build a wall in 10 days, how many days will it take 10 workers?",
+    "choices": [
+      "5 days",
+      "10 days",
+      "15 days",
+      "20 days"
+    ],
+    "correctAnswer": "5 days",
+    "score": 20
+  },
+  {
+    "id": 8,
+    "question": "What is the missing number in the pattern: 1, 4, 9, 16, 25, ?",
+    "choices": [
+      "30",
+      "36",
+      "40",
+      "45"
+    ],
+    "correctAnswer": "36",
+    "score": 15
+  },
+  {
+    "id": 9,
+    "question": "If all birds can fly, and penguins are birds, which statement is true?",
+    "choices": [
+      "Penguins can fly",
+      "Penguins cannot fly",
+      "The statement is false",
+      "Cannot be determined"
+    ],
+    "correctAnswer": "The statement is false",
+    "score": 25
+  },
+  {
+    "id": 10,
+    "question": "What number should replace the question mark: 7, 14, 21, 28, ?",
+    "choices": [
+      "32",
+      "35",
+      "38",
+      "42"
+    ],
+    "correctAnswer": "35",
+    "score": 10
+  },
+  {
+    "id": 11,
+    "question": "Complete the sequence: Z, Y, X, W, V, ?",
+    "choices": [
+      "U",
+      "T",
+      "S",
+      "R"
+    ],
+    "correctAnswer": "U",
+    "score": 10
+  },
+  {
+    "id": 12,
+    "question": "If RED is to COLOR as APPLE is to ?",
+    "choices": [
+      "Fruit",
+      "Red",
+      "Tree",
+      "Food"
+    ],
+    "correctAnswer": "Fruit",
+    "score": 15
+  },
+  {
+    "id": 13,
+    "question": "What is the next number: 1, 3, 6, 10, 15, ?",
+    "choices": [
+      "18",
+      "20",
+      "21",
+      "24"
+    ],
+    "correctAnswer": "21",
+    "score": 20
+  },
+  {
+    "id": 14,
+    "question": "If today is Monday, what day will it be 100 days from now?",
+    "choices": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday"
+    ],
+    "correctAnswer": "Wednesday",
+    "score": 25
+  },
+  {
+    "id": 15,
+    "question": "What comes next in the pattern: 2, 5, 11, 23, 47, ?",
+    "choices": [
+      "89",
+      "91",
+      "95",
+      "97"
+    ],
+    "correctAnswer": "95",
+    "score": 30
+  },
+  {
+    "id": 16,
+    "question": "If all squares are rectangles, and all rectangles are quadrilaterals, which is true?",
+    "choices": [
+      "All quadrilaterals are squares",
+      "All squares are quadrilaterals",
+      "No squares are quadrilaterals",
+      "Cannot be determined"
+    ],
+    "correctAnswer": "All squares are quadrilaterals",
+    "score": 20
+  },
+  {
+    "id": 17,
+    "question": "What number is missing: 1, 8, 27, 64, ?",
+    "choices": [
+      "100",
+      "125",
+      "144",
+      "169"
+    ],
+    "correctAnswer": "125",
+    "score": 20
+  },
+  {
+    "id": 18,
+    "question": "Complete: If all A are B, and some B are C, then:",
+    "choices": [
+      "All A are C",
+      "Some A are C",
+      "No A are C",
+      "Cannot be determined"
+    ],
+    "correctAnswer": "Cannot be determined",
+    "score": 25
+  },
+  {
+    "id": 19,
+    "question": "What is the pattern: 5, 10, 20, 40, ?",
+    "choices": [
+      "60",
+      "70",
+      "80",
+      "90"
+    ],
+    "correctAnswer": "80",
+    "score": 15
+  },
+  {
+    "id": 20,
+    "question": "If MOUSE is to COMPUTER as WHEEL is to ?",
+    "choices": [
+      "Car",
+      "Bicycle",
+      "Steering",
+      "Road"
+    ],
+    "correctAnswer": "Car",
+    "score": 20
+  }
+]

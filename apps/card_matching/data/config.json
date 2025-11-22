@@ -1,0 +1,32 @@
+{
+  "customImages": [],
+  "showTimer": true,
+  "defaultDifficultyId": "starter",
+  "difficulties": [
+    {
+      "id": "starter",
+      "label": "Starter · 6 pairs",
+      "pairs": 6
+    },
+    {
+      "id": "challenger",
+      "label": "Challenger · 8 pairs",
+      "pairs": 8
+    },
+    {
+      "id": "master",
+      "label": "Master · 10 pairs",
+      "pairs": 10
+    },
+    {
+      "id": "diff-1763482377828-nfzjgb",
+      "label": "Custom · 12 pairs",
+      "pairs": 12
+    },
+    {
+      "id": "diff-1763482576642-vyk0ix",
+      "label": "Custom · 14 pairs",
+      "pairs": 14
+    }
+  ]
+}

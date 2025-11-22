@@ -1,0 +1,50 @@
+APPLICATIONS LOADING & SYNC FLOW
+================================
+
+1. ADMIN AUTH
+   └─ Admin opens dashboard
+      └─ POST /auth/login
+         └─ Session cookie issued (httpOnly)
+
+2. DISCOVERY & SYNC
+   └─ Admin clicks "Sync Apps"
+      └─ POST /api/applications/sync
+         ├─ Verify session is admin
+         ├─ discoverApps()
+         │   ├─ Scan ../apps directory
+         │   └─ Merge overrides from apps/apps-map.json
+         ├─ syncAppsToDatabase()
+         │   ├─ Upsert Firestore documents
+         │   └─ Stamp health/status metadata
+         └─ writeLog apps.sync.*
+
+3. DATA STORE
+   └─ Firestore collection "applications"
+      ├─ Holds discovered + manually created apps
+      └─ Source of truth for UI/API
+
+4. API SURFACE
+   ├─ GET /api/applications
+   │   ├─ Roles allowed: admin, supervisor
+   │   ├─ Optional filters: status, platform, limit
+   │   ├─ Supervisor-specific filtering via assignedApplications
+   │   └─ writeLog applications.list.*
+   ├─ GET/PUT/DELETE /api/applications/{id}
+   │   ├─ Role checks (admin for read/update/delete)
+   │   ├─ Reads or mutates Firestore document
+   │   └─ writeLog applications.get/update/delete
+   └─ GET /api/applications/sync
+       ├─ Admin only
+       ├─ Runs discoverApps() without saving
+       └─ writeLog apps.sync.status
+
+5. ADMIN UI (src/app/admin/applications/page.tsx)
+   ├─ On mount → fetch('/api/applications') → render cards/grid
+   ├─ Create/update/delete actions hit the respective API routes
+   ├─ Sync button triggers POST /api/applications/sync
+   └─ After any mutation, refetch list to stay in sync
+
+6. LOGGING & OBSERVABILITY
+   └─ writeLog events emitted for every API and sync step
+      (applications.*, apps.sync.*) to feed dashboards/audits
+

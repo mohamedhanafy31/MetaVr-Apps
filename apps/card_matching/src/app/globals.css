@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Card match animations */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+  20%, 40%, 60%, 80% { transform: translateX(8px); }
+}
+
+@keyframes wrong-flash {
+  0%, 100% { border-color: rgba(255, 255, 255, 0.5); background-color: rgba(255, 255, 255, 0.2); }
+  50% { border-color: rgba(239, 68, 68, 0.8); background-color: rgba(239, 68, 68, 0.3); }
+}
+
+@keyframes correct-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes correct-glow {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(52, 211, 153, 0.4);
+    border-color: rgba(52, 211, 153, 0.6);
+  }
+  50% { 
+    box-shadow: 0 0 30px rgba(52, 211, 153, 0.8), 0 0 40px rgba(52, 211, 153, 0.5);
+    border-color: rgba(52, 211, 153, 1);
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
+@keyframes bounce-in {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.card-wrong-match {
+  animation: shake 0.5s ease-in-out, wrong-flash 0.5s ease-in-out;
+}
+
+.card-correct-match {
+  animation: correct-pulse 0.6s ease-in-out, correct-glow 0.6s ease-in-out;
+}
+
+.card-just-matched {
+  animation: bounce-in 0.4s ease-out;
+}

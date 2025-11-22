@@ -1,0 +1,78 @@
+# ============================================
+# cURL Command to Create Access Request
+# ============================================
+
+# Basic cURL command (replace APP_ID with actual Firestore document ID):
+curl -X POST http://localhost:4000/user-access/request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test.user@example.com",
+    "appIds": ["APP_ID_HERE"],
+    "name": "Test User",
+    "phone": "+1234567890"
+  }'
+
+# Example with multiple apps:
+curl -X POST http://localhost:4000/user-access/request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john.doe@example.com",
+    "appIds": ["APP_ID_1", "APP_ID_2"],
+    "name": "John Doe",
+    "phone": "+1-555-123-4567"
+  }'
+
+# For first-time users, name and phone are required:
+curl -X POST http://localhost:4000/user-access/request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "newuser@example.com",
+    "appIds": ["APP_ID_HERE"],
+    "name": "New User",
+    "phone": "+1234567890"
+  }'
+
+# Minimal request (for existing users):
+curl -X POST http://localhost:4000/user-access/request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "existing.user@example.com",
+    "appIds": ["APP_ID_HERE"]
+  }'
+
+# ============================================
+# Expected Response (Success):
+# ============================================
+# {
+#   "success": true,
+#   "message": "Access request(s) created successfully",
+#   "createdRequests": 1,
+#   "alreadyHasAccess": []
+# }
+
+# ============================================
+# Expected Response (User already has access):
+# ============================================
+# {
+#   "success": true,
+#   "message": "User already has access to all requested apps",
+#   "createdRequests": 0,
+#   "alreadyHasAccess": [
+#     {
+#       "appId": "APP_ID",
+#       "appKey": "iq-questions",
+#       "appName": "IQ Questions"
+#     }
+#   ]
+# }
+
+# ============================================
+# Error Response (Invalid app ID):
+# ============================================
+# {
+#   "statusCode": 400,
+#   "message": "No valid applications found",
+#   "timestamp": "2025-11-22T05:53:22.248Z",
+#   "path": "/user-access/request"
+# }
+

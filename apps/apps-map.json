@@ -1,0 +1,24 @@
+{
+  "iq-questions": {
+    "name": "IQ Questions",
+    "port": 3001,
+    "platform": "web",
+    "description": "Challenge your mind with timed IQ questions, instant feedback, and detailed explanations designed for learners of all levels.",
+    "configPath": "apps/iq-questions/app/config/page.tsx"
+  },
+  "card_matching": {
+    "name": "Card Matching",
+    "port": 3002,
+    "platform": "web",
+    "description": "Train your memory with a relaxing card matching experience featuring smooth animations, gentle audio, and progressive difficulty modes.",
+    "configPath": "apps/card_matching/src/app/config/page.tsx"
+  },
+  "AI-npc": {
+    "name": "AI NPC",
+    "port": 3003,
+    "platform": "web",
+    "description": "Interact with intelligent AI-powered non-player characters in an immersive virtual environment. Experience dynamic conversations and realistic AI behavior in this cutting-edge VR/AR application.",
+    "configPath": "apps/AI-npc/app/config/page.tsx"
+  }
+}
+
